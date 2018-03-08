@@ -11,7 +11,8 @@ class lstm(nn.Module):
         self.batch_size = batch_size
         self.n_layers = n_layers
         self.embed = nn.Linear(input_size, hidden_size)
-        self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size) for i in range(self.n_layers)])
+        #self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size) for i in range(self.n_layers)])
+        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers, batch_first=True)
         self.output = nn.Sequential(
                 nn.Linear(hidden_size, output_size),
                 #nn.BatchNorm1d(output_size),
@@ -20,17 +21,20 @@ class lstm(nn.Module):
 
     def init_hidden(self):
         hidden = []
-        for i in range(self.n_layers):
-            hidden.append((Variable(torch.zeros(self.batch_size, self.hidden_size).cuda()),
-                           Variable(torch.zeros(self.batch_size, self.hidden_size).cuda())))
-        return hidden
+        # for i in range(self.n_layers):
+        #     hidden.append((Variable(torch.zeros(self.batch_size, self.hidden_size).cuda()),
+        #                    Variable(torch.zeros(self.batch_size, self.hidden_size).cuda())))
+        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)),
+                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)))
+        #return hidden
 
     def forward(self, input):
         embedded = self.embed(input.view(-1, self.input_size))
         h_in = embedded
-        for i in range(self.n_layers):
-            self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
-            h_in = self.hidden[i][0]
+        h_in = self.lstm(h_in, self.hidden)[1][-1].squeeze(0)#view(self.batch_size, self.hidden_size)
+        # for i in range(self.n_layers):
+        #     self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
+        #     h_in = self.hidden[i][0]
 
         return self.output(h_in)
 
@@ -43,17 +47,20 @@ class gaussian_lstm(nn.Module):
         self.n_layers = n_layers
         self.batch_size = batch_size
         self.embed = nn.Linear(input_size, hidden_size)
-        self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size) for i in range(self.n_layers)])
+        #self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size, bidirectional=True) for i in range(self.n_layers)])
+        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers, batch_first=True)
         self.mu_net = nn.Linear(hidden_size, output_size)
         self.logvar_net = nn.Linear(hidden_size, output_size)
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
         hidden = []
-        for i in range(self.n_layers):
-            hidden.append((Variable(torch.zeros(self.batch_size, self.hidden_size).cuda()),
-                           Variable(torch.zeros(self.batch_size, self.hidden_size).cuda())))
-        return hidden
+        # for i in range(self.n_layers):
+        #     hidden.append((Variable(torch.zeros(self.batch_size, self.hidden_size).cuda()),
+        #                    Variable(torch.zeros(self.batch_size, self.hidden_size).cuda())))
+        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)),
+                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)))
+        #return hidden
 
     def reparameterize(self, mu, logvar):
         logvar = logvar.mul(0.5).exp_()
@@ -63,9 +70,11 @@ class gaussian_lstm(nn.Module):
     def forward(self, input):
         embedded = self.embed(input.view(-1, self.input_size))
         h_in = embedded
-        for i in range(self.n_layers):
-            self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
-            h_in = self.hidden[i][0]
+        h_in = self.lstm(h_in, self.hidden)[1][-1].squeeze(0)#view(self.batch_size, self.hidden_size)
+        # for i in range(self.n_layers):
+        #     self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
+        #     h_in = self.hidden[i][0]
+
         mu = self.mu_net(h_in)
         logvar = self.logvar_net(h_in)
         z = self.reparameterize(mu, logvar)

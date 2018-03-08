@@ -68,7 +68,6 @@ torch.manual_seed(opt.seed)
 torch.cuda.manual_seed_all(opt.seed)
 dtype = torch.cuda.FloatTensor
 
-
 # ---------------- load the models  ----------------
 
 print(opt)
@@ -137,6 +136,7 @@ def kl_criterion(mu1, logvar1, mu2, logvar2):
     return kld.sum() / opt.batch_size
 
 # --------- transfer to gpu ------------------------------------
+
 frame_predictor.cuda()
 posterior.cuda()
 prior.cuda()
@@ -304,19 +304,32 @@ def train(x):
     mse = 0
     kld = 0
     for i in range(1, opt.n_past+opt.n_future):
+        print("===============")
+        print("h in", x[i-1].size())
         h = encoder(x[i-1])
+        print("h out", h.size())
+        print("h t in", x[i].size())
         h_target = encoder(x[i])[0]
+        print("h t out", h_target.size())
         if opt.last_frame_skip or i < opt.n_past:	
+            print("skip for frame %d"%i)
             h, skip = h
         else:
             h = h[0]
         z_t, mu, logvar = posterior(h_target)
+        print("post dims: z_t", z_t.size(), " mu:", mu.size(), " logvar:", logvar.size())
         _, mu_p, logvar_p = prior(h)
+        print("prior dims: z_t", _.size(), " mu:", mu_p.size(), " logvar:", logvar_p.size())
+        print("fp input:", torch.cat([h, z_t], 1).size())
         h_pred = frame_predictor(torch.cat([h, z_t], 1))
+        print("fp op:",h_pred.size())
         x_pred = decoder([h_pred, skip])
+        print("xpred op:",x_pred.size())
         mse += mse_criterion(x_pred, x[i])
+        print("mse:", mse)
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
-
+        print("kld:", kld)
+    exit()
     loss = mse + kld*opt.beta
     loss.backward()
 
