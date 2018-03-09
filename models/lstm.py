@@ -11,32 +11,30 @@ class lstm(nn.Module):
         self.batch_size = batch_size
         self.n_layers = n_layers
         self.embed = nn.Linear(input_size, hidden_size)
-        #self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size) for i in range(self.n_layers)])
-        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers, batch_first=True)
+        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers)
         self.output = nn.Sequential(
-                nn.Linear(hidden_size, output_size),
+                nn.Linear(2*hidden_size, output_size),
                 #nn.BatchNorm1d(output_size),
                 nn.Tanh())
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
         hidden = []
-        # for i in range(self.n_layers):
-        #     hidden.append((Variable(torch.zeros(self.batch_size, self.hidden_size).cuda()),
-        #                    Variable(torch.zeros(self.batch_size, self.hidden_size).cuda())))
-        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)),
-                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)))
+        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()),
+                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()))
         #return hidden
 
     def forward(self, input):
-        embedded = self.embed(input.view(-1, self.input_size))
-        h_in = embedded
-        h_in = self.lstm(h_in, self.hidden)[1][-1].squeeze(0)#view(self.batch_size, self.hidden_size)
-        # for i in range(self.n_layers):
-        #     self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
-        #     h_in = self.hidden[i][0]
+        embedded = []
+        for i in range(input.size()[0]):
+            embedded.append(self.embed(input[i].squeeze(0)))
+        embedded = torch.stack(embedded)
+ 
 
-        return self.output(h_in)
+        h_in = self.lstm(embedded, self.hidden)[0]
+        op = torch.stack([self.output(i) for i in h_in])
+        return op
+
 
 class gaussian_lstm(nn.Module):
     def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size):
@@ -47,20 +45,15 @@ class gaussian_lstm(nn.Module):
         self.n_layers = n_layers
         self.batch_size = batch_size
         self.embed = nn.Linear(input_size, hidden_size)
-        #self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size, bidirectional=True) for i in range(self.n_layers)])
-        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers, batch_first=True)
-        self.mu_net = nn.Linear(hidden_size, output_size)
-        self.logvar_net = nn.Linear(hidden_size, output_size)
+        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers)
+        self.mu_net = nn.Linear(2*hidden_size, output_size)
+        self.logvar_net = nn.Linear(2*hidden_size, output_size)
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
         hidden = []
-        # for i in range(self.n_layers):
-        #     hidden.append((Variable(torch.zeros(self.batch_size, self.hidden_size).cuda()),
-        #                    Variable(torch.zeros(self.batch_size, self.hidden_size).cuda())))
-        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)),
-                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size)))
-        #return hidden
+        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()),
+                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()))
 
     def reparameterize(self, mu, logvar):
         logvar = logvar.mul(0.5).exp_()
@@ -68,15 +61,18 @@ class gaussian_lstm(nn.Module):
         return eps.mul(logvar).add_(mu)
 
     def forward(self, input):
-        embedded = self.embed(input.view(-1, self.input_size))
-        h_in = embedded
-        h_in = self.lstm(h_in, self.hidden)[1][-1].squeeze(0)#view(self.batch_size, self.hidden_size)
-        # for i in range(self.n_layers):
-        #     self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
-        #     h_in = self.hidden[i][0]
+        embedded = []
+        for i in range(input.size()[0]):
+            embedded.append(self.embed(input[i].squeeze(0)))
+        embedded = torch.stack(embedded)
 
-        mu = self.mu_net(h_in)
-        logvar = self.logvar_net(h_in)
-        z = self.reparameterize(mu, logvar)
+        h_in = self.lstm(embedded, self.hidden)[0]
+        mu, logvar = [], []
+        for i in h_in:
+            i = i.squeeze(0)
+            mu.append(self.mu_net(i))
+            logvar.append(self.logvar_net(i))
+
+        z = torch.stack([self.reparameterize(i, j) for i,j in zip(mu, logvar)])
         return z, mu, logvar
             

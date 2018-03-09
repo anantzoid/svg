@@ -38,6 +38,7 @@ parser.add_argument('--model', default='dcgan', help='model type (dcgan | vgg)')
 parser.add_argument('--data_threads', type=int, default=5, help='number of data loading threads')
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
+parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
 
 
 
@@ -143,6 +144,13 @@ prior.cuda()
 encoder.cuda()
 decoder.cuda()
 mse_criterion.cuda()
+
+if opt.multi == 1:
+    encoder = torch.nn.DataParallel(encoder, device_ids=range(torch.cuda.device_count()))
+    decoder = torch.nn.DataParallel(decoder, device_ids=range(torch.cuda.device_count()))
+    frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(torch.cuda.device_count()))
+    posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
+    prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
 
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
@@ -297,39 +305,78 @@ def train(x):
     decoder.zero_grad()
 
     # initialize the hidden state.
-    frame_predictor.hidden = frame_predictor.init_hidden()
-    posterior.hidden = posterior.init_hidden()
-    prior.hidden = prior.init_hidden()
+    if opt.multi:
+        frame_predictor.hidden = frame_predictor.module.init_hidden()
+        posterior.hidden = posterior.module.init_hidden()
+        prior.hidden = prior.module.init_hidden()
+    else:
+        frame_predictor.hidden = frame_predictor.init_hidden()
+        posterior.hidden = posterior.init_hidden()
+        prior.hidden = prior.init_hidden()
 
     mse = 0
     kld = 0
+
+    h_encoded, priors, posteriors = [], [], []     
+    for i in range(0, opt.n_past+opt.n_future):
+        h_encoded.append(encoder(x[i]))
+    
+    h = torch.stack([h_encoded[i][0] for i in range(0, opt.n_past+opt.n_future-1)])
+    h_target = torch.stack([h_encoded[i][0] for i in range(1, opt.n_past+opt.n_future)])
+    #print("h:", h.size())
+    #print("h_target:", h_target.size())
+    posteriors = posterior(h)
+    #print("post:", posteriors[0].size())
+    priors = prior(h_target)
+    #print("prior:", priors[0].size())
+   
+    pred_ip = torch.stack([torch.cat([h[i], posteriors[0][i]], 1) for i in range(opt.n_past+opt.n_future-1)])
+    #print("pred_ip:", pred_ip.size())
+    h_preds = frame_predictor(pred_ip)
+    #print("pred_op:", h_preds.size())
+    x_pred = []
+    for i in range(opt.n_past+opt.n_future-1):
+        if i < opt.n_past-1:
+            skip = h_encoded[i][1]
+        x_pred.append(decoder([h_preds[i], skip]))
+        mse += mse_criterion(x_pred[-1], x[i+1])
+        #print(i)
+        kld += kl_criterion(posteriors[1][i], posteriors[2][i], priors[1][i], priors[2][i])
+
+    #print("all x_preds:", x_pred.size()) 
+    #print("mse:", mse)
+    #print("kld:", kld)
+    #exit()
+
+    '''
     for i in range(1, opt.n_past+opt.n_future):
-        print("===============")
-        print("h in", x[i-1].size())
+        #print("===============")
+        #print("h in", x[i-1].size())
         h = encoder(x[i-1])
-        print("h out", h.size())
-        print("h t in", x[i].size())
+        #print("h out", h[0].size())
+        #print("h t in", x[i].size())
         h_target = encoder(x[i])[0]
-        print("h t out", h_target.size())
+        #print("h t out", h_target[0].size())
         if opt.last_frame_skip or i < opt.n_past:	
-            print("skip for frame %d"%i)
+            #print("skip for frame %d"%i)
             h, skip = h
         else:
             h = h[0]
         z_t, mu, logvar = posterior(h_target)
-        print("post dims: z_t", z_t.size(), " mu:", mu.size(), " logvar:", logvar.size())
+        #print("post dims: z_t", z_t.size(), " mu:", mu.size(), " logvar:", logvar.size())
         _, mu_p, logvar_p = prior(h)
-        print("prior dims: z_t", _.size(), " mu:", mu_p.size(), " logvar:", logvar_p.size())
-        print("fp input:", torch.cat([h, z_t], 1).size())
+        #print("prior dims: z_t", _.size(), " mu:", mu_p.size(), " logvar:", logvar_p.size())
+        #print("fp input:", torch.cat([h, z_t], 1).size())
         h_pred = frame_predictor(torch.cat([h, z_t], 1))
-        print("fp op:",h_pred.size())
+        #print("fp op:",h_pred.size())
         x_pred = decoder([h_pred, skip])
-        print("xpred op:",x_pred.size())
+        #print("xpred op:",x_pred.size())
         mse += mse_criterion(x_pred, x[i])
-        print("mse:", mse)
+        #print("mse:", mse)
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
-        print("kld:", kld)
-    exit()
+        #print("kld:", kld)
+    #exit()
+    '''
     loss = mse + kld*opt.beta
     loss.backward()
 
@@ -366,6 +413,9 @@ for epoch in range(opt.niter):
     utils.clear_progressbar()
 
     print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
+    continue
+
+
 
     # plot some stuff
     frame_predictor.eval()
