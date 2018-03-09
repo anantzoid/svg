@@ -74,5 +74,7 @@ class gaussian_lstm(nn.Module):
             logvar.append(self.logvar_net(i))
 
         z = torch.stack([self.reparameterize(i, j) for i,j in zip(mu, logvar)])
+        mu = torch.stack(mu)
+        logvar = torch.stack(logvar)
         return z, mu, logvar
             

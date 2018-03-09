@@ -260,6 +260,44 @@ def plot(x, epoch):
     utils.save_gif(fname, gifs)
 
 
+def plot_rec_new(x, epoch):
+    if opt.multi:
+        frame_predictor.hidden = frame_predictor.module.init_hidden()
+        posterior.hidden = posterior.module.init_hidden()
+    else:
+        frame_predictor.hidden = frame_predictor.init_hidden()
+        posterior.hidden = posterior.init_hidden()
+
+    gen_seq = []
+    gen_seq.append(x[0])
+    x_in = x[0]
+    h_encoded, priors, posteriors = [], [], []     
+    for i in range(0, opt.n_past+opt.n_future):
+        h_encoded.append(encoder(x[i]))
+
+    h = torch.stack([h_encoded[i][0] for i in range(0, opt.n_past+opt.n_future-1)])
+    h_target = torch.stack([h_encoded[i][0] for i in range(1, opt.n_past+opt.n_future)])
+    posteriors = posterior(h)
+    priors = prior(h_target)
+    pred_ip = torch.stack([torch.cat([h[i], posteriors[0][i]], 1) for i in range(opt.n_past+opt.n_future-1)])
+    h_preds = frame_predictor(pred_ip)
+    for i in range(opt.n_past+opt.n_future-1):
+        if i < opt.n_past-1:
+            skip = h_encoded[i][1]
+            gen_seq.append(x[i+1])
+        else:
+            gen_seq.append(decoder([h_preds[i], skip]))
+    to_plot = []
+    nrow = min(opt.batch_size, 10)
+    for i in range(nrow):
+        row = []
+        for t in range(opt.n_past+opt.n_future):
+            row.append(gen_seq[t][i]) 
+        to_plot.append(row)
+    fname = '%s/gen/new_rec_%d.png' % (opt.log_dir, epoch) 
+    utils.save_tensors_image(fname, to_plot)
+    
+
 def plot_rec(x, epoch):
     frame_predictor.hidden = frame_predictor.init_hidden()
     posterior.hidden = posterior.init_hidden()
@@ -327,6 +365,8 @@ def train(x):
     #print("h_target:", h_target.size())
     posteriors = posterior(h)
     #print("post:", posteriors[0].size())
+    #print("post1:", posteriors[1].size())
+    #print("post2:", posteriors[2].size())
     priors = prior(h_target)
     #print("prior:", priors[0].size())
    
@@ -348,35 +388,6 @@ def train(x):
     #print("kld:", kld)
     #exit()
 
-    '''
-    for i in range(1, opt.n_past+opt.n_future):
-        #print("===============")
-        #print("h in", x[i-1].size())
-        h = encoder(x[i-1])
-        #print("h out", h[0].size())
-        #print("h t in", x[i].size())
-        h_target = encoder(x[i])[0]
-        #print("h t out", h_target[0].size())
-        if opt.last_frame_skip or i < opt.n_past:	
-            #print("skip for frame %d"%i)
-            h, skip = h
-        else:
-            h = h[0]
-        z_t, mu, logvar = posterior(h_target)
-        #print("post dims: z_t", z_t.size(), " mu:", mu.size(), " logvar:", logvar.size())
-        _, mu_p, logvar_p = prior(h)
-        #print("prior dims: z_t", _.size(), " mu:", mu_p.size(), " logvar:", logvar_p.size())
-        #print("fp input:", torch.cat([h, z_t], 1).size())
-        h_pred = frame_predictor(torch.cat([h, z_t], 1))
-        #print("fp op:",h_pred.size())
-        x_pred = decoder([h_pred, skip])
-        #print("xpred op:",x_pred.size())
-        mse += mse_criterion(x_pred, x[i])
-        #print("mse:", mse)
-        kld += kl_criterion(mu, logvar, mu_p, logvar_p)
-        #print("kld:", kld)
-    #exit()
-    '''
     loss = mse + kld*opt.beta
     loss.backward()
 
@@ -408,13 +419,10 @@ for epoch in range(opt.niter):
         epoch_mse += mse
         epoch_kld += kld
 
-
     progress.finish()
     utils.clear_progressbar()
 
     print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
-    continue
-
 
 
     # plot some stuff
@@ -425,8 +433,10 @@ for epoch in range(opt.niter):
     prior.eval()
     
     x = next(testing_batch_generator)
-    plot(x, epoch)
-    plot_rec(x, epoch)
+    #plot(x, epoch)
+    #plot_rec(x, epoch)
+    plot_rec_new(x, epoch)
+    #exit()
 
     # save the model
     torch.save({
