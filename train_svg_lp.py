@@ -10,6 +10,7 @@ import utils
 import itertools
 import progressbar
 import numpy as np
+from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--lr', default=0.002, type=float, help='learning rate')
@@ -39,6 +40,7 @@ parser.add_argument('--data_threads', type=int, default=5, help='number of data 
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
+parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
 
 
 
@@ -62,6 +64,7 @@ else:
 os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
 os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
 opt.max_step = opt.n_past+opt.n_future
+writer = SummaryWriter(log_dir=os.path.join('plots', opt.name))
 
 print("Random Seed: ", opt.seed)
 random.seed(opt.seed)
@@ -115,7 +118,11 @@ if opt.model_dir != '':
     encoder = saved_model['encoder']
 else:
     encoder = model.encoder(opt.g_dim, opt.channels)
-    decoder = model.decoder(opt.g_dim, opt.channels)
+    if opt.noskip:
+        decoder = model.decoder_noskip(opt.g_dim, opt.channels)
+    else:
+        decoder = model.decoder(opt.g_dim, opt.channels)
+
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
 
@@ -183,6 +190,8 @@ def get_testing_batch():
 testing_batch_generator = get_testing_batch()
 
 # --------- plotting funtions ------------------------------------
+
+
 def plot(x, epoch):
     nsample = 20 
     gen_seq = [[] for i in range(nsample)]
@@ -271,14 +280,13 @@ def plot_rec_new(x, epoch):
     gen_seq = []
     gen_seq.append(x[0])
     x_in = x[0]
-    h_encoded, priors, posteriors = [], [], []     
+    h_encoded, posteriors = [], []  
     for i in range(0, opt.n_past+opt.n_future):
         h_encoded.append(encoder(x[i]))
 
     h = torch.stack([h_encoded[i][0] for i in range(0, opt.n_past+opt.n_future-1)])
     h_target = torch.stack([h_encoded[i][0] for i in range(1, opt.n_past+opt.n_future)])
     posteriors = posterior(h)
-    priors = prior(h_target)
     pred_ip = torch.stack([torch.cat([h[i], posteriors[0][i]], 1) for i in range(opt.n_past+opt.n_future-1)])
     h_preds = frame_predictor(pred_ip)
     for i in range(opt.n_past+opt.n_future-1):
@@ -286,7 +294,11 @@ def plot_rec_new(x, epoch):
             skip = h_encoded[i][1]
             gen_seq.append(x[i+1])
         else:
-            gen_seq.append(decoder([h_preds[i], skip]))
+            if opt.noskip:
+                gen_seq.append(decoder(h_preds[i]))
+            else:
+                gen_seq.append(decoder([h_preds[i], skip]))
+
     to_plot = []
     nrow = min(opt.batch_size, 10)
     for i in range(nrow):
@@ -378,7 +390,10 @@ def train(x):
     for i in range(opt.n_past+opt.n_future-1):
         if i < opt.n_past-1:
             skip = h_encoded[i][1]
-        x_pred.append(decoder([h_preds[i], skip]))
+        if opt.noskip:
+            x_pred.append(decoder(h_preds[i]))
+        else:
+            x_pred.append(decoder([h_preds[i], skip]))
         mse += mse_criterion(x_pred[-1], x[i+1])
         #print(i)
         kld += kl_criterion(posteriors[1][i], posteriors[2][i], priors[1][i], priors[2][i])
@@ -390,6 +405,11 @@ def train(x):
 
     loss = mse + kld*opt.beta
     loss.backward()
+    torch.nn.utils.clip_grad_norm(frame_predictor.parameters(), 1.0)
+    torch.nn.utils.clip_grad_norm(posterior.parameters(), 1.0)
+    torch.nn.utils.clip_grad_norm(prior.parameters(), 1.0)
+    torch.nn.utils.clip_grad_norm(encoder.parameters(), 1.0)
+    torch.nn.utils.clip_grad_norm(decoder.parameters(), 1.0)
 
     frame_predictor_optimizer.step()
     posterior_optimizer.step()
@@ -409,9 +429,9 @@ for epoch in range(opt.niter):
     decoder.train()
     epoch_mse = 0
     epoch_kld = 0
-    progress = progressbar.ProgressBar(max_value=opt.epoch_size).start()
+    #progress = progressbar.ProgressBar(max_value=opt.epoch_size).start()
     for i in range(opt.epoch_size):
-        progress.update(i+1)
+        #progress.update(i+1)
         x = next(training_batch_generator)
 
         # train frame_predictor 
@@ -419,11 +439,13 @@ for epoch in range(opt.niter):
         epoch_mse += mse
         epoch_kld += kld
 
-    progress.finish()
-    utils.clear_progressbar()
+    #progress.finish()
+    #utils.clear_progressbar()
 
     print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
-
+    writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
+    writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
+    #writer.add_scalars('train/losses', {'kld':epoch_kld/opt.epoch_size, 'mse':epoch_mse/opt.epoch_size}, epoch)
 
     # plot some stuff
     frame_predictor.eval()
