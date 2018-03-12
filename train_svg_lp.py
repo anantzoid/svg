@@ -41,6 +41,8 @@ parser.add_argument('--num_digits', type=int, default=2, help='number of digits 
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
 parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
+parser.add_argument('--skip_part', type=int, default=0, help='Only use last 2 layers of skip connections')
+parser.add_argument('--skip_weight', type=float, default=1.0, help='Trying weight factor on skip connection instead of complete removal')
 
 
 
@@ -121,7 +123,10 @@ else:
     if opt.noskip:
         decoder = model.decoder_noskip(opt.g_dim, opt.channels)
     else:
-        decoder = model.decoder(opt.g_dim, opt.channels)
+        if opt.skip_part:
+            decoder = model.decoder_skippart(opt.g_dim, opt.channels)
+        else:
+            decoder = model.decoder(opt.g_dim, opt.channels)
 
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
@@ -297,7 +302,7 @@ def plot_rec_new(x, epoch):
             if opt.noskip:
                 gen_seq.append(decoder(h_preds[i]))
             else:
-                gen_seq.append(decoder([h_preds[i], skip]))
+                gen_seq.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
 
     to_plot = []
     nrow = min(opt.batch_size, 10)
@@ -393,7 +398,7 @@ def train(x):
         if opt.noskip:
             x_pred.append(decoder(h_preds[i]))
         else:
-            x_pred.append(decoder([h_preds[i], skip]))
+            x_pred.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
         mse += mse_criterion(x_pred[-1], x[i+1])
         #print(i)
         kld += kl_criterion(posteriors[1][i], posteriors[2][i], priors[1][i], priors[2][i])
