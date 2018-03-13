@@ -43,7 +43,7 @@ parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
 parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
 parser.add_argument('--skip_part', type=int, default=0, help='Only use last 2 layers of skip connections')
 parser.add_argument('--skip_weight', type=float, default=1.0, help='Trying weight factor on skip connection instead of complete removal')
-parser.add_argument('--newlstm', type=int, default=0, help='BiLSTM only for posterior')
+parser.add_argument('--lstm_singledir', type=int, default=0, help='BiLSTM only for posterior')
 
 
 
@@ -96,9 +96,9 @@ if opt.model_dir != '':
     posterior = saved_model['posterior']
     prior = saved_model['prior']
 else:
-    frame_predictor = lstm_models.lstm(opt.g_dim+opt.z_dim, opt.g_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
+    frame_predictor = lstm_models.lstm(opt.g_dim+opt.z_dim, opt.g_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size, not(opt.lstm_singledir))
     posterior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
-    prior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
+    prior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size, not(opt.lstm_singledir))
     frame_predictor.apply(utils.init_weights)
     posterior.apply(utils.init_weights)
     prior.apply(utils.init_weights)
@@ -300,10 +300,7 @@ def plot_rec_new(x, epoch):
             skip = h_encoded[i][1]
             gen_seq.append(x[i+1])
         else:
-            if opt.noskip:
-                gen_seq.append(decoder(h_preds[i]))
-            else:
-                gen_seq.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
+            gen_seq.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
 
     to_plot = []
     nrow = min(opt.batch_size, 10)
@@ -396,10 +393,7 @@ def train(x):
     for i in range(opt.n_past+opt.n_future-1):
         if i < opt.n_past-1:
             skip = h_encoded[i][1]
-        if opt.noskip:
-            x_pred.append(decoder(h_preds[i]))
-        else:
-            x_pred.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
+        x_pred.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
         mse += mse_criterion(x_pred[-1], x[i+1])
         #print(i)
         kld += kl_criterion(posteriors[1][i], posteriors[2][i], priors[1][i], priors[2][i])

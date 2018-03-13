@@ -31,6 +31,7 @@ parser.add_argument('--dataset', default='moving_dot', help='dataset to train wi
 #parser.add_argument('--g_dim', type=int, default=64, help='number of layers')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 #parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
+parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
 
 
 opt = parser.parse_args()
@@ -138,7 +139,11 @@ def make_gifs(x, idx):
             x_in = x[i]
         else:
             h_pred = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0)).squeeze(0).detach()
-            x_in = decoder([h_pred, skip]).detach()
+            #TODO remove this going forward
+            if opt.noskip:
+                x_in = decoder(h_pred).detach()
+            else:
+                x_in = decoder([h_pred, skip]).detach()
             posterior_gen.append(x_in)
   
 
@@ -177,7 +182,11 @@ def make_gifs(x, idx):
                 all_gen[s].append(x_in)
             else:
                 h = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0)).squeeze(0).detach()
-                x_in = decoder([h, skip]).detach()
+                if opt.noskip:
+                    x_in = decoder(h).detach()
+                else:
+                    x_in = decoder([h, skip]).detach()
+
                 gen_seq.append(x_in.data.cpu().numpy())
                 gt_seq.append(x[i].data.cpu().numpy())
                 all_gen[s].append(x_in)

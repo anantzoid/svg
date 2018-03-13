@@ -112,6 +112,8 @@ class decoder_noskip(nn.Module):
                 )
 
     def forward(self, input):
+        if isinstance(input, list):
+            input = input[0]
         vec = input 
         d1 = self.upc1(vec.view(-1, self.dim, 1, 1))
         d2 = self.upc2(d1)

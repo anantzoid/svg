@@ -3,25 +3,34 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 class lstm(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size):
+    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size, bidirectional=True):
         super(lstm, self).__init__()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.batch_size = batch_size
         self.n_layers = n_layers
+        self.bidirectional = bidirectional
         self.embed = nn.Linear(input_size, hidden_size)
-        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers)
-        self.output = nn.Sequential(
-                nn.Linear(2*hidden_size, output_size),
-                #nn.BatchNorm1d(output_size),
-                nn.Tanh())
+        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=bidirectional, num_layers=self.n_layers)
+        if self.bidirectional:
+            self.output = nn.Sequential(
+                    nn.Linear(2*hidden_size, output_size),
+                    nn.Tanh())
+        else:
+            self.output = nn.Sequential(
+                    nn.Linear(hidden_size, output_size),
+                    nn.Tanh())
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
         hidden = []
-        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()),
-                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()))
+        if self.bidirectional:
+            return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()),
+                        Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()))
+        else:
+            return (Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size).cuda()),
+                        Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size).cuda()))
         #return hidden
 
     def forward(self, input):
@@ -37,23 +46,32 @@ class lstm(nn.Module):
 
 
 class gaussian_lstm(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size):
+    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size, bidirectional=True):
         super(gaussian_lstm, self).__init__()
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.n_layers = n_layers
         self.batch_size = batch_size
+        self.bidirectional = bidirectional
         self.embed = nn.Linear(input_size, hidden_size)
-        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=True, num_layers=self.n_layers)
-        self.mu_net = nn.Linear(2*hidden_size, output_size)
-        self.logvar_net = nn.Linear(2*hidden_size, output_size)
+        self.lstm = nn.LSTM(hidden_size, hidden_size, bidirectional=bidirectional, num_layers=self.n_layers)
+        if self.bidirectional:
+            self.mu_net = nn.Linear(2*hidden_size, output_size)
+            self.logvar_net = nn.Linear(2*hidden_size, output_size)
+        else:
+            self.mu_net = nn.Linear(hidden_size, output_size)
+            self.logvar_net = nn.Linear(hidden_size, output_size)
         self.hidden = self.init_hidden()
 
     def init_hidden(self):
         hidden = []
-        return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()),
-                       Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()))
+        if self.bidirectional:
+            return (Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()),
+                        Variable(torch.zeros(self.n_layers*2, self.batch_size, self.hidden_size).cuda()))
+        else:
+            return (Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size).cuda()),
+                        Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size).cuda()))
 
     def reparameterize(self, mu, logvar):
         logvar = logvar.mul(0.5).exp_()
