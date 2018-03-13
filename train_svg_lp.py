@@ -43,6 +43,7 @@ parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
 parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
 parser.add_argument('--skip_part', type=int, default=0, help='Only use last 2 layers of skip connections')
 parser.add_argument('--skip_weight', type=float, default=1.0, help='Trying weight factor on skip connection instead of complete removal')
+parser.add_argument('--newlstm', type=int, default=0, help='BiLSTM only for posterior')
 
 
 

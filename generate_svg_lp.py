@@ -27,10 +27,10 @@ parser.add_argument('--data_root', default='', help='root directory for data')
 parser.add_argument('--image_width', type=int, default=64, help='the height / width of the input image to network')
 parser.add_argument('--channels', default=3, type=int)
 parser.add_argument('--dataset', default='moving_dot', help='dataset to train with')
-parser.add_argument('--z_dim', type=int, default=2, help='number of layers')
-parser.add_argument('--g_dim', type=int, default=64, help='number of layers')
+#parser.add_argument('--z_dim', type=int, default=2, help='number of layers')
+#parser.add_argument('--g_dim', type=int, default=64, help='number of layers')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
-parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
+#parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 
 
 opt = parser.parse_args()
@@ -130,13 +130,14 @@ def make_gifs(x, idx):
         else:
             h, _ = h
         h = h.detach()
-        z_t, _, _= posterior(h_target)
+        z_t, _, _= posterior(h_target.unsqueeze(0))
+        z_t = z_t.squeeze(0)
         if i < opt.n_past:
-            frame_predictor(torch.cat([h, z_t], 1)) 
+            #frame_predictor(torch.cat([h, z_t], 1)) 
             posterior_gen.append(x[i])
             x_in = x[i]
         else:
-            h_pred = frame_predictor(torch.cat([h, z_t], 1)).detach()
+            h_pred = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0)).squeeze(0).detach()
             x_in = decoder([h_pred, skip]).detach()
             posterior_gen.append(x_in)
   
@@ -165,15 +166,17 @@ def make_gifs(x, idx):
             h = h.detach()
             if i + 1 < opt.n_past:
                 h_target = encoder(x[i])[0].detach()
-                z_t, _, _ = posterior(h_target)
+                z_t, _, _ = posterior(h_target.unsqueeze(0))
+                z_t = z_t.squeeze(0)
             else:
-                z_t, _, _ = prior(h)
+                z_t, _, _ = prior(h.unsqueeze(0))
+                z_t = z_t.squeeze(0)
             if i < opt.n_past:
-                frame_predictor(torch.cat([h, z_t], 1))
+                #frame_predictor(torch.cat([h, z_t], 1))
                 x_in = x[i]
                 all_gen[s].append(x_in)
             else:
-                h = frame_predictor(torch.cat([h, z_t], 1)).detach()
+                h = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0)).squeeze(0).detach()
                 x_in = decoder([h, skip]).detach()
                 gen_seq.append(x_in.data.cpu().numpy())
                 gt_seq.append(x[i].data.cpu().numpy())
