@@ -139,11 +139,7 @@ def make_gifs(x, idx):
             x_in = x[i]
         else:
             h_pred = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0)).squeeze(0).detach()
-            #TODO remove this going forward
-            if opt.noskip:
-                x_in = decoder(h_pred).detach()
-            else:
-                x_in = decoder([h_pred, skip]).detach()
+            x_in = decoder([h_pred, skip]).detach()
             posterior_gen.append(x_in)
   
 
