@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=high
-#SBATCH --time=100:00:00
+#SBATCH --job-name=high2
+#SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --gres=gpu:1 -c1
@@ -57,3 +57,9 @@ source activate env1
 # high capacity 0 kl loss
 #python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm10 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --model highcap
 #multi-scale decoder loss
+
+#3/20
+##super highcap model with lr decay & old lstm
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm13 --rnn_size 512 --lr 0.01 --model highcap
+##run above with kl 0
+python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14 --rnn_size 512 --lr 0.01 --model highcap
