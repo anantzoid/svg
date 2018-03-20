@@ -1,17 +1,17 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=gen4
+#SBATCH --job-name=high
 #SBATCH --time=100:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=50GB
+#SBATCH --mem=100GB
 #SBATCH --gres=gpu:1 -c1
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
 module purge
 #module load tensorflow/python3.6/1.5.0
-source activate nlp
+source activate env1
 
 #python train_svg_lp.py --dataset smmnist --num_digits 2 --g_dim 128 --z_dim 10 --beta 0.0001 --data_root data/mnist --log_dir logs --name mnist_lp_original
 #python generate_svg_lp.py --model_path pretrain_models/svglp_bair.pth --log_dir pretrained_lp --data_root /scratch/ag4508/svg --dataset bair --z_dim 10 --g_dim 128
@@ -46,4 +46,14 @@ source activate nlp
 #python generate_svg_lp.py --log_dir gen/bilstm3 --model_path logs/bair/model\=dcgan64x64-rnn_size\=256-rnn_layers\=2-n_past\=2-n_future\=10-lr\=0.0020-g_dim\=128-z_dim\=64-last_frame_skip\=False-beta\=0.0001000bairbilstm3/model.pth --num_threads 5 --nsample 20 --noskip 1
 #python generate_svg_lp.py --log_dir gen/bilstm4 --model_path logs/bair/model\=dcgan64x64-rnn_size\=256-rnn_layers\=2-n_past\=2-n_future\=10-lr\=0.0020-g_dim\=128-z_dim\=64-last_frame_skip\=False-beta\=0.0001000bairbilstm4/model.pth --num_threads 5 --nsample 20 --noskip 0
 #python generate_svg_lp.py --log_dir gen/bilstm4 --model_path logs/bair/model\=dcgan64x64-rnn_size\=256-rnn_layers\=2-n_past\=2-n_future\=10-lr\=0.0020-g_dim\=128-z_dim\=64-last_frame_skip\=False-beta\=0.0001000bairbilstm4/model.pth --num_threads 5 --nsample 20 --noskip 0
-python generate_svg_lp.py --log_dir gen/bilstm6 --model_path logs/bair/model\=dcgan64x64-rnn_size\=256-rnn_layers\=2-n_past\=2-n_future\=10-lr\=0.0020-g_dim\=128-z_dim\=64-last_frame_skip\=False-beta\=0.0001000bairbilstm6/model.pth --num_threads 5 --nsample 20
+#python generate_svg_lp.py --log_dir gen/bilstm6 --model_path logs/bair/model\=dcgan64x64-rnn_size\=256-rnn_layers\=2-n_past\=2-n_future\=10-lr\=0.0020-g_dim\=128-z_dim\=64-last_frame_skip\=False-beta\=0.0001000bairbilstm6/model.pth --num_threads 5 --nsample 20
+
+#3/19
+#0 kl loss
+#python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm7 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1
+#decoder mulit-update --- didn't run
+###python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm8 --lstm_singledir 1 --beta 0.0001 --lstm_singledir_posterior 1 --decoder_updates 5 --batch_size 50
+#python mdecoder_train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm9 --lstm_singledir 1 --beta 0.0001 --lstm_singledir_posterior 1 --decoder_updates 10
+# high capacity 0 kl loss
+#python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm10 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --model highcap
+#multi-scale decoder loss

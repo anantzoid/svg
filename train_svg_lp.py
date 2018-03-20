@@ -43,7 +43,9 @@ parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
 parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
 parser.add_argument('--skip_part', type=int, default=0, help='Only use last 2 layers of skip connections')
 parser.add_argument('--skip_weight', type=float, default=1.0, help='Trying weight factor on skip connection instead of complete removal')
-parser.add_argument('--lstm_singledir', type=int, default=0, help='BiLSTM only for posterior')
+parser.add_argument('--lstm_singledir', type=int, default=0, help='single-direction lstm for frame_preditor & prior')
+parser.add_argument('--lstm_singledir_posterior', type=int, default=0, help='BiLSTM posterior')
+parser.add_argument('--decoder_updates', type=int, default=0, help='')
 
 
 
@@ -97,13 +99,15 @@ if opt.model_dir != '':
     prior = saved_model['prior']
 else:
     frame_predictor = lstm_models.lstm(opt.g_dim+opt.z_dim, opt.g_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size, not(opt.lstm_singledir))
-    posterior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
+    posterior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size, not(opt.lstm_singledir_posterior))
     prior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size, not(opt.lstm_singledir))
     frame_predictor.apply(utils.init_weights)
     posterior.apply(utils.init_weights)
     prior.apply(utils.init_weights)
 
-if opt.model == 'dcgan':
+if opt.model == 'highcap':
+    import models.dcgan_64_high as model
+elif opt.model == 'dcgan':
     if opt.image_width == 64:
         import models.dcgan_64 as model 
     elif opt.image_width == 128:
@@ -131,6 +135,8 @@ else:
 
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
+
+
 
 frame_predictor_optimizer = opt.optimizer(frame_predictor.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 posterior_optimizer = opt.optimizer(posterior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -376,34 +382,37 @@ def train(x):
     
     h = torch.stack([h_encoded[i][0] for i in range(0, opt.n_past+opt.n_future-1)])
     h_target = torch.stack([h_encoded[i][0] for i in range(1, opt.n_past+opt.n_future)])
-    #print("h:", h.size())
-    #print("h_target:", h_target.size())
     posteriors = posterior(h)
-    #print("post:", posteriors[0].size())
-    #print("post1:", posteriors[1].size())
-    #print("post2:", posteriors[2].size())
     priors = prior(h_target)
-    #print("prior:", priors[0].size())
    
     pred_ip = torch.stack([torch.cat([h[i], posteriors[0][i]], 1) for i in range(opt.n_past+opt.n_future-1)])
-    #print("pred_ip:", pred_ip.size())
     h_preds = frame_predictor(pred_ip)
-    #print("pred_op:", h_preds.size())
+
     x_pred = []
     for i in range(opt.n_past+opt.n_future-1):
         if i < opt.n_past-1:
             skip = h_encoded[i][1]
         x_pred.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
         mse += mse_criterion(x_pred[-1], x[i+1])
-        #print(i)
         kld += kl_criterion(posteriors[1][i], posteriors[2][i], priors[1][i], priors[2][i])
 
-    #print("all x_preds:", x_pred.size()) 
-    #print("mse:", mse)
-    #print("kld:", kld)
-    #exit()
 
-    loss = mse + kld*opt.beta
+    #####Decoder Multiple updates#######
+    '''
+    _mse = 0
+    h_preds = [_.detach() for _ in h_preds]
+    skip = [_.detach() for _ in skip]
+    for nu in range(opt.decoder_updates):
+        x_pred = []
+        for i in range(opt.n_past+opt.n_future-1):
+            if i < opt.n_past-1:
+                skip = h_encoded[i][1]
+            x_pred.append(decoder([h_preds[i], skip]))
+            _mse += mse_criterion(x_pred[-1], x[i+1])
+    '''
+    ##################################
+
+    loss = mse + kld*opt.beta# + _mse
     loss.backward()
     torch.nn.utils.clip_grad_norm(frame_predictor.parameters(), 1.0)
     torch.nn.utils.clip_grad_norm(posterior.parameters(), 1.0)
@@ -417,8 +426,7 @@ def train(x):
     encoder_optimizer.step()
     decoder_optimizer.step()
 
-
-    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
+    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past), 0# _mse.data.cpu().numpy()/((opt.n_future+opt.n_past)*opt.decoder_updates)
 
 # --------- training loop ------------------------------------
 for epoch in range(opt.niter):
@@ -435,16 +443,17 @@ for epoch in range(opt.niter):
         x = next(training_batch_generator)
 
         # train frame_predictor 
-        mse, kld = train(x)
+        mse, kld, _mse = train(x)
         epoch_mse += mse
         epoch_kld += kld
 
     #progress.finish()
     #utils.clear_progressbar()
 
-    print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
+    print('[%02d] mse loss: %.5f | kld loss: %.5f (%d), %.5f' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size, _mse))
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
+    #writer.add_scalar('_mse', _mse, epoch)
     #writer.add_scalars('train/losses', {'kld':epoch_kld/opt.epoch_size, 'mse':epoch_mse/opt.epoch_size}, epoch)
 
     # plot some stuff
