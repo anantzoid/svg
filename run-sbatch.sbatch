@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=high2
+#SBATCH --job-name=id
 #SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
@@ -60,6 +60,13 @@ source activate env1
 
 #3/20
 ##super highcap model with lr decay & old lstm
-#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm13 --rnn_size 512 --lr 0.01 --model highcap
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm13 --rnn_size 512 --lr 0.01 --model highcap --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0100-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0001000bairbilstm13  
 ##run above with kl 0
-python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14 --rnn_size 512 --lr 0.01 --model highcap
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14 --rnn_size 512 --lr 0.01 --model highcap
+
+
+#Identity function x->enc->posterior->fp->dec->x
+#python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity1 --rnn_size 512 --lr 0.01 --model highcap --noskip 1 --epoch_size 100 --niter 50
+#above continued
+python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity1 --rnn_size 512 --lr 0.0001 --model highcap --noskip 1 --epoch_size 600 --niter 100 --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0100-g_dim=512-z_dim=256-last_frame_skip=False-beta=0.0000000identity1/continued
+

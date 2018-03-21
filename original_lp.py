@@ -338,7 +338,7 @@ def train(x):
         h_pred = frame_predictor(torch.cat([h, z_t], 1))
         x_pred = decoder([h_pred, skip])
         mse += mse_criterion(x_pred, x[i])
-        kld += kl_criterion(mu, logvar, mu_p, logvar_p)
+        #kld += kl_criterion(mu, logvar, mu_p, logvar_p)
 
     loss = mse + kld*opt.beta
     loss.backward()
@@ -350,7 +350,7 @@ def train(x):
     decoder_optimizer.step()
 
 
-    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
+    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), 0#kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
 
 # --------- training loop ------------------------------------
 for epoch in range(opt.niter):
