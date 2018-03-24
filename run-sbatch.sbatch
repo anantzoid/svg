@@ -11,7 +11,7 @@
 
 module purge
 #module load tensorflow/python3.6/1.5.0
-source activate env1
+source activate env
 
 #python train_svg_lp.py --dataset smmnist --num_digits 2 --g_dim 128 --z_dim 10 --beta 0.0001 --data_root data/mnist --log_dir logs --name mnist_lp_original
 #python generate_svg_lp.py --model_path pretrain_models/svglp_bair.pth --log_dir pretrained_lp --data_root /scratch/ag4508/svg --dataset bair --z_dim 10 --g_dim 128
@@ -61,7 +61,7 @@ source activate env1
 #default model
 #python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm11 --lstm_singledir 1 --beta 0.0001 --lstm_singledir_posterior 1 
 #kl 0 default model
-python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm12 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 
+python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm12 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000bairbilstm12 
 #kl 0 high cap model
 
 
