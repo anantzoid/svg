@@ -81,6 +81,7 @@ dtype = torch.cuda.FloatTensor
 
 print(opt)
 
+
 # ---------------- optimizers ----------------
 if opt.optimizer == 'adam':
     opt.optimizer = optim.Adam
@@ -478,7 +479,18 @@ for epoch in range(opt.niter):
         'prior': prior,
         'opt': opt},
         '%s/model.pth' % opt.log_dir)
-    if epoch % 10 == 0:
+    try:
+        torch.save({
+            'encoder': encoder.module,
+            'decoder': decoder.module,
+            'frame_predictor': frame_predictor.module,
+            'posterior': posterior.module,
+            'prior': prior.module,
+            'opt': opt},
+            '%s/model_parallel.pth' % opt.log_dir)
+    except:
+        pass
+if epoch % 10 == 0:
         print('log dir: %s' % opt.log_dir)
         
 

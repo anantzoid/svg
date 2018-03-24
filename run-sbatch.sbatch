@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=id
-#SBATCH --time=10:00:00
+#SBATCH --job-name=hc
+#SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --gres=gpu:1 -c1
@@ -10,8 +10,8 @@
 #SBATCH --mail-user=ag4508@nyu.edu
 
 module purge
-#module load tensorflow/python3.6/1.5.0
-source activate env1
+#module load tensorflow/python2.7/20170707
+source activate env
 
 #python train_svg_lp.py --dataset smmnist --num_digits 2 --g_dim 128 --z_dim 10 --beta 0.0001 --data_root data/mnist --log_dir logs --name mnist_lp_original
 #python generate_svg_lp.py --model_path pretrain_models/svglp_bair.pth --log_dir pretrained_lp --data_root /scratch/ag4508/svg --dataset bair --z_dim 10 --g_dim 128
@@ -64,9 +64,34 @@ source activate env1
 ##run above with kl 0
 #python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14 --rnn_size 512 --lr 0.01 --model highcap
 
-
 #Identity function x->enc->posterior->fp->dec->x
 #python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity1 --rnn_size 512 --lr 0.01 --model highcap --noskip 1 --epoch_size 100 --niter 50
 #above continued
-python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity1 --rnn_size 512 --lr 0.0001 --model highcap --noskip 1 --epoch_size 600 --niter 100 --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0100-g_dim=512-z_dim=256-last_frame_skip=False-beta=0.0000000identity1/continued
+#python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity1 --rnn_size 512 --lr 0.0001 --model highcap --noskip 1 --epoch_size 600 --niter 100 --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0100-g_dim=512-z_dim=256-last_frame_skip=False-beta=0.0000000identity1/continued
 
+# 3/22
+#python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity2 --rnn_size 512 --lr 0.01 --model highcap --noskip 1 --epoch_size 600 --niter 100 
+
+####Ignore highcap0 and 1####
+#original highcap kl0 lrscheduling
+#python original_lp.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name highcap0 --rnn_size 512 --lr 0.01 --model highcap --niter 100
+#original highcap kl0 
+#python original_lp.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name highcap1 --rnn_size 512 --model highcap --niter 100
+
+
+#original kl0
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name orig0  --niter 100
+
+#identity default lr
+#python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity3 --rnn_size 512  --model highcap --noskip 1 --epoch_size 600 --niter 100 
+
+#continuing train_svg_lp kl0
+#python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 1 --name bairbilstm7cont --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000bairbilstm7 --lr 0.0003
+
+
+# 3/23
+# Continuing identity with lesser lr
+#python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity3cont --rnn_size 512  --model highcap --noskip 1 --epoch_size 600 --niter 100 --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=4-n_future=4-lr=0.0020-g_dim=512-z_dim=256-last_frame_skip=False-beta=0.0000000identity3 --lr 0.0003 
+
+#continue original highcap kl0
+python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14cont --rnn_size 512 --lr 0.0003 --model highcap --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0100-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0000000bairbilstm14

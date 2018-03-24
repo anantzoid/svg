@@ -46,7 +46,7 @@ parser.add_argument('--data_threads', type=int, default=5, help='number of data 
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
-
+parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
 
 
 opt = parser.parse_args()
@@ -79,7 +79,6 @@ writer = SummaryWriter(log_dir=os.path.join('plots', opt.name))
 
 
 # ---------------- load the models  ----------------
-
 print(opt)
 
 # ---------------- optimizers ----------------
@@ -135,7 +134,6 @@ else:
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
 
-'''
 print("======Encoder==========")
 print(encoder)
 print("======Predictor==========")
@@ -146,12 +144,7 @@ print("======Posterior==========")
 print(posterior)
 print("======Prior==========")
 print(prior)
-exit()
-
-'''
-opt.lr = 0.001 
-opt.epoch_size = 600
-opt.niter = 100
+#exit()
 
 frame_predictor_optimizer = opt.optimizer(frame_predictor.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 posterior_optimizer = opt.optimizer(posterior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -177,6 +170,14 @@ prior.cuda()
 encoder.cuda()
 decoder.cuda()
 mse_criterion.cuda()
+
+if opt.multi == 1:
+    encoder = torch.nn.DataParallel(encoder, device_ids=range(torch.cuda.device_count()))
+    decoder = torch.nn.DataParallel(decoder, device_ids=range(torch.cuda.device_count()))
+    frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(torch.cuda.device_count()))
+    posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
+    prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
+
 
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
@@ -287,8 +288,13 @@ def plot(x, epoch):
 
 
 def plot_rec(x, epoch):
-    frame_predictor.hidden = frame_predictor.init_hidden()
-    posterior.hidden = posterior.init_hidden()
+    if opt.multi:
+        frame_predictor.hidden = frame_predictor.module.init_hidden()
+        posterior.hidden = posterior.module.init_hidden()
+    else:
+        frame_predictor.hidden = frame_predictor.init_hidden()
+        posterior.hidden = posterior.init_hidden()
+
     gen_seq = []
     gen_seq.append(x[0])
     x_in = x[0]
@@ -296,13 +302,11 @@ def plot_rec(x, epoch):
     for i in range(opt.n_past+opt.n_future):
         h_target = encoder(x[i])[0]
         z_t, mu, logvar = posterior(h_target)
-        if i < opt.n_past:
-            gen_seq.append(x[i])
-        else:
-            h_pred = frame_predictor(z_t)
-            x_pred = decoder(h_pred)
-            gen_seq.append(x_pred)
- 
+        h_pred = frame_predictor(z_t)
+        x_pred = decoder(h_pred)
+        gen_seq.append(x[i])
+        gen_seq.append(x_pred)
+
 
     ''' 
     for i in range(1, opt.n_past+opt.n_future):
@@ -344,9 +348,14 @@ def train(x):
     decoder.zero_grad()
 
     # initialize the hidden state.
-    frame_predictor.hidden = frame_predictor.init_hidden()
-    posterior.hidden = posterior.init_hidden()
-    prior.hidden = prior.init_hidden()
+    if opt.multi:
+        frame_predictor.hidden = frame_predictor.module.init_hidden()
+        posterior.hidden = posterior.module.init_hidden()
+        prior.hidden = prior.module.init_hidden()
+    else:
+        frame_predictor.hidden = frame_predictor.init_hidden()
+        posterior.hidden = posterior.init_hidden()
+        prior.hidden = prior.init_hidden()
 
     mse = 0
     kld = 0
@@ -435,11 +444,24 @@ for epoch in range(opt.niter):
         'prior': prior,
         'opt': opt},
         '%s/model.pth' % opt.log_dir)
+    try:
+        torch.save({
+            'encoder': encoder.module,
+            'decoder': decoder.module,
+            'frame_predictor': frame_predictor.module,
+            'posterior': posterior.module,
+            'prior': prior.module,
+            'opt': opt},
+            '%s/model_parallel.pth' % opt.log_dir)
+    except:
+        pass
+
+
     if epoch % 10 == 0:
         print('log dir: %s' % opt.log_dir)
 
-
-    lr = opt.lr * (0.5 ** (epoch // 20))
+    '''
+    lr = opt.lr * (0.1 ** (epoch // 30))
     print("LR changed to: ", lr)
     for param_group in frame_predictor_optimizer.param_groups:
         param_group['lr'] = lr
@@ -452,3 +474,4 @@ for epoch in range(opt.niter):
     for param_group in decoder_optimizer.param_groups:
         param_group['lr'] = lr
 
+    '''
