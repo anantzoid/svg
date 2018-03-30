@@ -44,10 +44,12 @@ parser.add_argument('--data_threads', type=int, default=5, help='number of data 
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
+parser.add_argument('--msloss', type=int, default=0, help='Use mulitple gpus')
 
 
 
 opt = parser.parse_args()
+opt.step = 0
 if opt.model_dir != '':
     # load model and continue training from checkpoint
     saved_model = torch.load('%s/model.pth' % opt.model_dir)
@@ -107,6 +109,8 @@ else:
 
 if opt.model == 'highcap':
     import models.dcgan_64_high as model
+elif opt.model == 'highcap128':
+    import models.dcgan_128_high as model
 elif opt.model == 'dcgan':
     if opt.image_width == 64:
         import models.dcgan_64 as model 
@@ -175,6 +179,10 @@ if opt.multi == 1:
     posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
     prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
 
+
+if opt.msloss:
+    multiscale_loss = utils.MultiScaleLoss()
+    multiscale_loss.cuda()
 
 
 # --------- load a dataset ------------------------------------
@@ -313,7 +321,7 @@ def plot_rec(x, epoch):
             gen_seq.append(x[i])
         else:
             h_pred = frame_predictor(torch.cat([h, z_t], 1))
-            x_pred = decoder([h_pred, skip]).detach()
+            x_pred, _ = decoder([h_pred, skip])#.detach()
             gen_seq.append(x_pred)
    
     to_plot = []
@@ -357,9 +365,11 @@ def train(x):
         z_t, mu, logvar = posterior(h_target)
         _, mu_p, logvar_p = prior(h)
         h_pred = frame_predictor(torch.cat([h, z_t], 1))
-        x_pred = decoder([h_pred, skip])
+        x_pred, _scales = decoder([h_pred, skip])
+        if opt.msloss:
+            mse += multiscale_loss(_scales, x[i])  
         mse += mse_criterion(x_pred, x[i])
-        #kld += kl_criterion(mu, logvar, mu_p, logvar_p)
+        kld += kl_criterion(mu, logvar, mu_p, logvar_p)
 
     loss = mse + kld*opt.beta
     loss.backward()
@@ -371,7 +381,7 @@ def train(x):
     decoder_optimizer.step()
 
 
-    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), 0#kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
+    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
 
 # --------- training loop ------------------------------------
 for epoch in range(opt.niter):
@@ -394,11 +404,12 @@ for epoch in range(opt.niter):
 
 
     #progress.finish()
-    utils.clear_progressbar()
+    #utils.clear_progressbar()
 
     print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
-    writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
-    writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
+    writer.add_scalar('mse', epoch_mse/opt.epoch_size, opt.step)
+    writer.add_scalar('kld', epoch_kld/opt.epoch_size, opt.step)
+    opt.step += 1
 
     # plot some stuff
     frame_predictor.eval()

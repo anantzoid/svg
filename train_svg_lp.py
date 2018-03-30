@@ -46,6 +46,7 @@ parser.add_argument('--skip_weight', type=float, default=1.0, help='Trying weigh
 parser.add_argument('--lstm_singledir', type=int, default=0, help='single-direction lstm for frame_preditor & prior')
 parser.add_argument('--lstm_singledir_posterior', type=int, default=0, help='BiLSTM posterior')
 parser.add_argument('--decoder_updates', type=int, default=0, help='')
+parser.add_argument('--msloss', type=int, default=0, help='Use mulitple gpus')
 
 
 
@@ -171,6 +172,11 @@ if opt.multi == 1:
     frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(torch.cuda.device_count()))
     posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
     prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
+
+
+if opt.msloss:
+    multiscale_loss = utils.MultiScaleLoss()
+    multiscale_loss.cuda()
 
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
@@ -307,7 +313,7 @@ def plot_rec_new(x, epoch):
             skip = h_encoded[i][1]
             gen_seq.append(x[i+1])
         else:
-            gen_seq.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
+            gen_seq.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]])[0])
 
     to_plot = []
     nrow = min(opt.batch_size, 10)
@@ -389,12 +395,16 @@ def train(x):
     pred_ip = torch.stack([torch.cat([h[i], posteriors[0][i]], 1) for i in range(opt.n_past+opt.n_future-1)])
     h_preds = frame_predictor(pred_ip)
 
-    x_pred = []
     for i in range(opt.n_past+opt.n_future-1):
         if i < opt.n_past-1:
             skip = h_encoded[i][1]
-        x_pred.append(decoder([h_preds[i], [_*opt.skip_weight for _ in skip]]))
-        mse += mse_criterion(x_pred[-1], x[i+1])
+        _t, _scales = decoder([h_preds[i], [_*opt.skip_weight for _ in skip]])
+        if opt.msloss:
+            mse += mse_criterion(_t, x[i+1])
+            mse += multiscale_loss(_scales, x[i+1])
+        else:
+            mse += mse_criterion(_t, x[i+1])
+
         kld += kl_criterion(posteriors[1][i], posteriors[2][i], priors[1][i], priors[2][i])
 
 

@@ -16,6 +16,7 @@ from scipy import signal
 from scipy import ndimage
 from PIL import Image, ImageDraw
 
+import torch.nn as nn
 
 from torchvision import datasets, transforms
 from torch.autograd import Variable
@@ -285,4 +286,20 @@ def init_weights(m):
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
+
+
+class MultiScaleLoss(nn.Module):
+    def __init__(self):
+        super(MultiScaleLoss, self).__init__()
+        self.pool = nn.AvgPool2d(3, 2, padding=1)
+        self.loss_w = [0.01, 0.001, 0.0001]
+        self.mse_criterion = nn.MSELoss()
+    def forward(self, outputs, target):
+        _mse = 0
+        t = [target]
+        for en,out in enumerate(outputs[::-1]):
+            t.append(self.pool(t[-1]))
+            _mse += self.loss_w[en] * self.mse_criterion(out, t[-1])
+        return _mse
+
 

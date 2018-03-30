@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=hc
+#SBATCH --job-name=id1
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
@@ -56,7 +56,13 @@ source activate env
 #python mdecoder_train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm9 --lstm_singledir 1 --beta 0.0001 --lstm_singledir_posterior 1 --decoder_updates 10
 # high capacity 0 kl loss
 #python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm10 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --model highcap
+
 #multi-scale decoder loss
+#default model
+#python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm11 --lstm_singledir 1 --beta 0.0001 --lstm_singledir_posterior 1 
+# kl0
+#python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm12 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 
+
 
 #3/20
 ##super highcap model with lr decay & old lstm
@@ -94,4 +100,41 @@ source activate env
 #python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity3cont --rnn_size 512  --model highcap --noskip 1 --epoch_size 600 --niter 100 --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=4-n_future=4-lr=0.0020-g_dim=512-z_dim=256-last_frame_skip=False-beta=0.0000000identity3 --lr 0.0003 
 
 #continue original highcap kl0
-python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14cont --rnn_size 512 --lr 0.0003 --model highcap --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0100-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0000000bairbilstm14
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14cont --rnn_size 512 --lr 0.0003 --model highcap --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0100-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0000000bairbilstm14
+# continue msloss for kl0
+#python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 0 --name bairbilstm12 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000bairbilstm12 
+#kl 0 high cap model
+#python train_svg_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name highcapmsloss --rnn_size 512 --lr 0.0003 --model highcap --msloss 1 
+
+# 3/24
+#continuing bilstm7cont
+## Did this RUN??
+#python train_svg_lp.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --multi 1 --name bairbilstm7contcont --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000bairbilstm7/continued --lr 0.0001
+
+# 3/26
+#continuing good performing highcapmsloss
+#python train_svg_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name highcapmsloss --rnn_size 512 --lr 0.0003 --model highcap --msloss 1 --model_dir logs/bair/model=highcap64x64-rnn_size=512-rnn_layers=2-n_past=2-n_future=10-lr=0.0003-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0000000highcapmsloss  
+
+#highcap msloss klset
+#python train_svg_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name highcapmslosslp --rnn_size 512 --lr 0.0003 --model highcap --msloss 1 
+
+#highcap msloss uniLSTM model kl0
+#python train_svg_lp.py --dataset bair --g_dim 256 --z_dim 128 --lstm_singledir 1 --beta 0 --lstm_singledir_posterior 1 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name highcapmslossunilstm --rnn_size 512 --lr 0.0003 --model highcap --msloss 1 
+
+#highcap msloss uniLSTM model kl set
+#python train_svg_lp.py --dataset bair --g_dim 256 --z_dim 128 --lstm_singledir 1 --beta 0.0001 --lstm_singledir_posterior 1 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name highcapmslossunilstmkl --rnn_size 512 --lr 0.0003 --model highcap --msloss 1 
+
+# 3/28
+#msloss on unilstm (original), since unilstm on train_sv_lp is giving unexpected higher error
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name orighighcapmsloss --rnn_size 512 --lr 0.0003 --model highcap --msloss 1 --batch_size 128 
+
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name orighighcapmslosskl --rnn_size 512 --lr 0.0003 --model highcap --msloss 1 --batch_size 128
+
+# Orignal highcap kl0 with smaller lr from start --contrary to bairbilstm14
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name orighighcap --rnn_size 512 --lr 0.0003 --model highcap --msloss 0 --batch_size 128
+#above with klset
+#python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name orighighcapkl --rnn_size 512 --lr 0.0003 --model highcap --msloss 0 --batch_size 128
+
+#identiy with good lr init
+#python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity4 --rnn_size 512  --model highcap --noskip 1  --lr 0.0003
+#python identity.py --dataset bair --g_dim 256 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity5 --rnn_size 512  --model highcap --noskip 1  --lr 0.0003

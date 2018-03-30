@@ -386,7 +386,7 @@ def train(x):
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
     '''
 
-    loss = mse + kld*opt.beta
+    loss = mse# + kld*opt.beta
     loss.backward()
 
     frame_predictor_optimizer.step()
