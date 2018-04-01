@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=id1
+#SBATCH --job-name=pw10
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
@@ -138,3 +138,12 @@ source activate env
 #identiy with good lr init
 #python identity.py --dataset bair --g_dim 512 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity4 --rnn_size 512  --model highcap --noskip 1  --lr 0.0003
 #python identity.py --dataset bair --g_dim 256 --z_dim 256 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity5 --rnn_size 512  --model highcap --noskip 1  --lr 0.0003
+
+# 3/31
+#working command
+#python original_lp.py --dataset bair --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 2 --name temp --msloss 0 --batch_size 16 --epoch_size 10 --niter 1
+
+# 1/4
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --plot_dir plots_new --data_threads 10 --name pw1 --epoch_size 100 --batch_size 128 --niter 10 --pw 1
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --plot_dir plots_new --data_threads 10 --name pw5 --epoch_size 100 --batch_size 128 --niter 10 --pw 5
+python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --plot_dir plots_new --data_threads 10 --name pw5 --epoch_size 100 --batch_size 128 --niter 10 --pw 10

@@ -45,6 +45,8 @@ parser.add_argument('--num_digits', type=int, default=2, help='number of digits 
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
 parser.add_argument('--msloss', type=int, default=0, help='Use mulitple gpus')
+parser.add_argument('--pw', type=float, default=10.0, help='Use mulitple gpus')
+parser.add_argument('--plot_dir', default='plots', help='base directory to save logs')
 
 
 
@@ -67,7 +69,7 @@ else:
         opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
 
 os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
-os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
+#os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
 opt.max_step = opt.n_past+opt.n_future
 
 print("Random Seed: ", opt.seed)
@@ -75,7 +77,7 @@ random.seed(opt.seed)
 torch.manual_seed(opt.seed)
 torch.cuda.manual_seed_all(opt.seed)
 dtype = torch.cuda.FloatTensor
-writer = SummaryWriter(log_dir=os.path.join('plots', opt.name))
+writer = SummaryWriter(log_dir=os.path.join(opt.plot_dir, opt.name))
 
 
 # ---------------- load the models  ----------------
@@ -155,6 +157,8 @@ decoder_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.be
 
 # --------- loss functions ------------------------------------
 mse_criterion = nn.MSELoss()
+pixel_mse_criterion = nn.MSELoss(reduce=False)
+
 def kl_criterion(mu1, logvar1, mu2, logvar2):
     # KL( N(mu_1, sigma2_1) || N(mu_2, sigma2_2)) = 
     #   log( sqrt(
@@ -171,6 +175,7 @@ prior.cuda()
 encoder.cuda()
 decoder.cuda()
 mse_criterion.cuda()
+pixel_mse_criterion.cuda()
 
 if opt.multi == 1:
     encoder = torch.nn.DataParallel(encoder, device_ids=range(torch.cuda.device_count()))
@@ -293,7 +298,7 @@ def plot(x, epoch):
     utils.save_gif(fname, gifs)
 
 
-def plot_rec(x, epoch):
+def plot_rec(x, epoch, _dir):
     if opt.multi:
         frame_predictor.hidden = frame_predictor.module.init_hidden()
         posterior.hidden = posterior.module.init_hidden()
@@ -302,9 +307,10 @@ def plot_rec(x, epoch):
         posterior.hidden = posterior.init_hidden()
 
 
-    gen_seq = []
+    gen_seq, gt_seq = [], []
     gen_seq.append(x[0])
     x_in = x[0]
+    psnr, ssim = [], []
     for i in range(1, opt.n_past+opt.n_future):
         h = encoder(x[i-1])
         h_target = encoder(x[i])
@@ -323,6 +329,10 @@ def plot_rec(x, epoch):
             h_pred = frame_predictor(torch.cat([h, z_t], 1))
             x_pred, _ = decoder([h_pred, skip])#.detach()
             gen_seq.append(x_pred)
+            gt_seq.append(x[i])
+            #_ssim, _psnr = utils.eval_seq(x[i].data.cpu().numpy(), x_pred.data.cpu().numpy())
+            #ssim.append(_ssim)
+            #psnr.append(_psnr)
    
     to_plot = []
     nrow = min(opt.batch_size, 10)
@@ -331,8 +341,11 @@ def plot_rec(x, epoch):
         for t in range(opt.n_past+opt.n_future):
             row.append(gen_seq[t][i]) 
         to_plot.append(row)
-    fname = '%s/gen/rec_%d.png' % (opt.log_dir, epoch) 
+    fname = '%s/gen/%s_rec_%d.png' % (opt.log_dir, _dir, epoch) 
     utils.save_tensors_image(fname, to_plot)
+    
+    
+    return 0,0#np.mean(ssim), np.mean(psnr)
 
 
 # --------- training funtions ------------------------------------
@@ -368,7 +381,15 @@ def train(x):
         x_pred, _scales = decoder([h_pred, skip])
         if opt.msloss:
             mse += multiscale_loss(_scales, x[i])  
-        mse += mse_criterion(x_pred, x[i])
+
+        pmse = pixel_mse_criterion(x_pred, x[i])
+        _m = mse_criterion(x_pred, x[i])
+
+        pixel_weights = Variable(torch.ones(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
+        pixel_weights = pixel_weights.cuda()
+        pixel_weights[pmse.data > _m.data] = opt.pw
+
+        mse += torch.mean(pmse.mul(pixel_weights.detach()))
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
 
     loss = mse + kld*opt.beta
@@ -381,7 +402,7 @@ def train(x):
     decoder_optimizer.step()
 
 
-    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
+    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past), _m
 
 # --------- training loop ------------------------------------
 for epoch in range(opt.niter):
@@ -391,6 +412,7 @@ for epoch in range(opt.niter):
     encoder.train()
     decoder.train()
     epoch_mse = 0
+    epoch__mse = 0
     epoch_kld = 0
     #progress = progressbar.ProgressBar(max_value=opt.epoch_size).start()
     for i in range(opt.epoch_size):
@@ -398,17 +420,19 @@ for epoch in range(opt.niter):
         x = next(training_batch_generator)
 
         # train frame_predictor 
-        mse, kld = train(x)
+        mse, kld, _mse = train(x)
         epoch_mse += mse
         epoch_kld += kld
+        epoch__mse += _mse
 
 
-    #progress.finish()
-    #utils.clear_progressbar()
+        #progress.finish()
+        #utils.clear_progressbar()
+        print('[%02d] mse loss: %.5f | kld loss: %.5f | true_mse loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch__mse/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
 
-    print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, opt.step)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, opt.step)
+    writer.add_scalar('true_mse', epoch__mse/opt.epoch_size, opt.step)
     opt.step += 1
 
     # plot some stuff
@@ -417,10 +441,16 @@ for epoch in range(opt.niter):
     decoder.eval()
     posterior.eval()
     prior.eval()
-    
+   
+    ssim, psnr = plot_rec(x, epoch, 'train')
+    print("traineval:", ssim, psnr)
+    writer.add_scalar('train_ssim', ssim, opt.step)
+    writer.add_scalar('train_psnr', psnr, opt.step)
     x = next(testing_batch_generator)
     #plot(x, epoch)
-    plot_rec(x, epoch)
+    ssim, psnr = plot_rec(x, epoch, 'test')
+    writer.add_scalar('test_ssim', ssim, opt.step)
+    writer.add_scalar('test_psnr', psnr, opt.step)
 
     # save the model
     torch.save({
@@ -448,18 +478,4 @@ for epoch in range(opt.niter):
     if epoch % 10 == 0:
         print('log dir: %s' % opt.log_dir)
 
-    '''
-    lr = opt.lr * (0.1 ** (epoch // 30))
-    print("LR changed to: ", lr)
-    for param_group in frame_predictor_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in posterior_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in prior_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in encoder_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in decoder_optimizer.param_groups:
-        param_group['lr'] = lr
-    
-    '''
+

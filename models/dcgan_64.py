@@ -95,7 +95,7 @@ class decoder(nn.Module):
         d3 = self.upc3(torch.cat([d2, skip[2]], 1))
         d4 = self.upc4(torch.cat([d3, skip[1]], 1))
         output = self.upc5(torch.cat([d4, skip[0]], 1))
-        return (output, [self.pred_upc2(d2), self.pred_upc3(d3), self.pred_upc4(d4)])
+        return (output, None)#[self.pred_upc2(d2), self.pred_upc3(d3), self.pred_upc4(d4)])
 
 class decoder_noskip(nn.Module):
     def __init__(self, dim, nc=1):
