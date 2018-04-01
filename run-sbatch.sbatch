@@ -5,7 +5,7 @@
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
-#SBATCH --gres=gpu:1 -c1
+#SBATCH --gres=gpu:p100 -c1
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
@@ -144,6 +144,6 @@ source activate env
 #python original_lp.py --dataset bair --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 2 --name temp --msloss 0 --batch_size 16 --epoch_size 10 --niter 1
 
 # 1/4
-#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --plot_dir plots_new --data_threads 10 --name pw1 --epoch_size 100 --batch_size 128 --niter 10 --pw 1
-#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --plot_dir plots_new --data_threads 10 --name pw5 --epoch_size 100 --batch_size 128 --niter 10 --pw 5
-python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --plot_dir plots_new --data_threads 10 --name pw5 --epoch_size 100 --batch_size 128 --niter 10 --pw 10
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw1  --batch_size 128 --pw 1
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw5  --batch_size 128 --pw 5
+python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw10 --batch_size 128 --pw 10

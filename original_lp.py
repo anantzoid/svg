@@ -307,10 +307,9 @@ def plot_rec(x, epoch, _dir):
         posterior.hidden = posterior.init_hidden()
 
 
-    gen_seq, gt_seq = [], []
+    gen_seq, gt_seq, pred_seq = [], [], []
     gen_seq.append(x[0])
     x_in = x[0]
-    psnr, ssim = [], []
     for i in range(1, opt.n_past+opt.n_future):
         h = encoder(x[i-1])
         h_target = encoder(x[i])
@@ -329,10 +328,10 @@ def plot_rec(x, epoch, _dir):
             h_pred = frame_predictor(torch.cat([h, z_t], 1))
             x_pred, _ = decoder([h_pred, skip])#.detach()
             gen_seq.append(x_pred)
-            gt_seq.append(x[i])
-            #_ssim, _psnr = utils.eval_seq(x[i].data.cpu().numpy(), x_pred.data.cpu().numpy())
-            #ssim.append(_ssim)
-            #psnr.append(_psnr)
+
+            pred_seq.append(x_pred.data.cpu().numpy())
+            gt_seq.append(x[i].data.cpu().numpy())
+    _, ssim, psnr = utils.eval_seq(gt_seq, pred_seq)
    
     to_plot = []
     nrow = min(opt.batch_size, 10)
@@ -344,8 +343,7 @@ def plot_rec(x, epoch, _dir):
     fname = '%s/gen/%s_rec_%d.png' % (opt.log_dir, _dir, epoch) 
     utils.save_tensors_image(fname, to_plot)
     
-    
-    return 0,0#np.mean(ssim), np.mean(psnr)
+    return np.mean(ssim), np.mean(psnr)
 
 
 # --------- training funtions ------------------------------------
@@ -426,14 +424,13 @@ for epoch in range(opt.niter):
         epoch__mse += _mse
 
 
-        #progress.finish()
-        #utils.clear_progressbar()
-        print('[%02d] mse loss: %.5f | kld loss: %.5f | true_mse loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch__mse/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
+    #progress.finish()
+    #utils.clear_progressbar()
+    print('[%02d] mse loss: %.5f | kld loss: %.5f | true_mse loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch__mse/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
 
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, opt.step)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, opt.step)
     writer.add_scalar('true_mse', epoch__mse/opt.epoch_size, opt.step)
-    opt.step += 1
 
     # plot some stuff
     frame_predictor.eval()
@@ -477,5 +474,6 @@ for epoch in range(opt.niter):
 
     if epoch % 10 == 0:
         print('log dir: %s' % opt.log_dir)
+    opt.step += 1
 
 
