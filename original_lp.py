@@ -44,9 +44,12 @@ parser.add_argument('--data_threads', type=int, default=5, help='number of data 
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 parser.add_argument('--multi', type=int, default=0, help='Use mulitple gpus')
-parser.add_argument('--msloss', type=int, default=0, help='Use mulitple gpus')
-parser.add_argument('--pw', type=float, default=10.0, help='Use mulitple gpus')
+parser.add_argument('--msloss', type=int, default=0, help='multiscale loss')
+parser.add_argument('--pw', type=float, default=10.0, help='pixelwise weight')
 parser.add_argument('--plot_dir', default='plots', help='base directory to save logs')
+parser.add_argument('--orig_lstm', default=1, help='version of lstm script to use')
+parser.add_argument('--mse', default=0, help='use mse else use masked mse loss')
+parser.add_argument('--laplacian', type=int, default=0, help='Use mulitple gpus')
 
 
 
@@ -72,6 +75,25 @@ os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
 #os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
 opt.max_step = opt.n_past+opt.n_future
 
+##################################
+##################################
+opt.name = 'origvgg1_1'
+opt.mse = 1
+opt.orig_lstm = 1
+opt.plot_dir = 'plots2'
+opt.pw = 1
+opt.msloss = 0
+opt.multi = 0
+opt.step = 0
+opt.lr = 0.00002
+opt.laplacian = 0
+
+
+#opt.batch_size  = 16
+#opt.epoch_size = 10
+##################################
+##################################
+
 print("Random Seed: ", opt.seed)
 random.seed(opt.seed)
 torch.manual_seed(opt.seed)
@@ -95,8 +117,11 @@ else:
     raise ValueError('Unknown optimizer: %s' % opt.optimizer)
 
 
-#import models.lstm as lstm_models
-import models.original_lstm as lstm_models
+if opt.orig_lstm == 1:
+    import models.original_lstm as lstm_models
+else:
+    import models.lstm as lstm_models
+
 if opt.model_dir != '':
     frame_predictor = saved_model['frame_predictor']
     posterior = saved_model['posterior']
@@ -135,6 +160,7 @@ else:
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
 
+
 '''
 print("======Encoder==========")
 print(encoder)
@@ -146,7 +172,7 @@ print("======Posterior==========")
 print(posterior)
 print("======Prior==========")
 print(prior)
-exit()
+#exit()
 '''
 
 frame_predictor_optimizer = opt.optimizer(frame_predictor.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -184,11 +210,13 @@ if opt.multi == 1:
     posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
     prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
 
-
-if opt.msloss:
+if opt.msloss == 1:
     multiscale_loss = utils.MultiScaleLoss()
     multiscale_loss.cuda()
 
+if opt.laplacian == 1:
+    lap = utils.Laplacian()
+    lap.cuda()
 
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
@@ -355,7 +383,7 @@ def train(x):
     decoder.zero_grad()
 
     # initialize the hidden state.
-    if opt.multi:
+    if opt.multi == 1:
         frame_predictor.hidden = frame_predictor.module.init_hidden()
         posterior.hidden = posterior.module.init_hidden()
         prior.hidden = prior.module.init_hidden()
@@ -376,18 +404,36 @@ def train(x):
         z_t, mu, logvar = posterior(h_target)
         _, mu_p, logvar_p = prior(h)
         h_pred = frame_predictor(torch.cat([h, z_t], 1))
+
+
+        #x_pred, _scales = decoder([h_pred.detach(), [_.detach() for _ in skip]])
         x_pred, _scales = decoder([h_pred, skip])
-        if opt.msloss:
+
+        if opt.msloss == 1:
             mse += multiscale_loss(_scales, x[i])  
 
-        pmse = pixel_mse_criterion(x_pred, x[i])
-        _m = mse_criterion(x_pred, x[i])
+        if opt.laplacian == 1:
+            mse += lap(x_pred, x[i])
+            _m = mse
+        else:
+            if opt.mse == 1:
+                mse += mse_criterion(x_pred, x[i]) 
+                _m = mse
+            else:
+                pmse = pixel_mse_criterion(x_pred, x[i])
+                _m = mse_criterion(x_pred, x[i])
+                '''
+                # previous logic of adding weight to faulty pixels
+                pixel_weights = Variable(torch.ones(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
+                pixel_weights = pixel_weights.cuda()
+                pixel_weights[pmse.data < _m.data] = opt.pw
+                '''
+                pixel_weights = Variable(torch.zeros(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
+                pixel_weights = pixel_weights.cuda()
+                pixel_weights[pmse.data > _m.data] = 1.0
 
-        pixel_weights = Variable(torch.ones(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
-        pixel_weights = pixel_weights.cuda()
-        pixel_weights[pmse.data > _m.data] = opt.pw
+                mse += torch.mean(pmse.mul(pixel_weights.detach()))
 
-        mse += torch.mean(pmse.mul(pixel_weights.detach()))
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
 
     loss = mse + kld*opt.beta
@@ -440,12 +486,13 @@ for epoch in range(opt.niter):
     prior.eval()
    
     ssim, psnr = plot_rec(x, epoch, 'train')
-    print("traineval:", ssim, psnr)
+    print("train ssim: %.4f, psnr: %.4f"% (ssim, psnr))
     writer.add_scalar('train_ssim', ssim, opt.step)
     writer.add_scalar('train_psnr', psnr, opt.step)
     x = next(testing_batch_generator)
     #plot(x, epoch)
     ssim, psnr = plot_rec(x, epoch, 'test')
+    print("test ssim: %.4f, psnr: %.4f"% (ssim, psnr))
     writer.add_scalar('test_ssim', ssim, opt.step)
     writer.add_scalar('test_psnr', psnr, opt.step)
 

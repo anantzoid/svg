@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 class lstm(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size, bidirectional=True):
+    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size, bidirectional=False):
         super(lstm, self).__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -34,19 +34,24 @@ class lstm(nn.Module):
         #return hidden
 
     def forward(self, input):
+        if input.dim() == 2:
+            input = input.unsqueeze(0)
+
         embedded = []
         for i in range(input.size()[0]):
             embedded.append(self.embed(input[i].squeeze(0)))
         embedded = torch.stack(embedded)
- 
 
         h_in = self.lstm(embedded, self.hidden)[0]
         op = torch.stack([self.output(i) for i in h_in])
+        if op.size()[0] == 1:
+            op = op.squeeze(0)
+
         return op
 
 
 class gaussian_lstm(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size, bidirectional=True):
+    def __init__(self, input_size, output_size, hidden_size, n_layers, batch_size, bidirectional=False):
         super(gaussian_lstm, self).__init__()
         self.input_size = input_size
         self.output_size = output_size
@@ -79,6 +84,9 @@ class gaussian_lstm(nn.Module):
         return eps.mul(logvar).add_(mu)
 
     def forward(self, input):
+        if input.dim() == 2:
+            input = input.unsqueeze(0)
+
         embedded = []
         for i in range(input.size()[0]):
             embedded.append(self.embed(input[i].squeeze(0)))
@@ -94,5 +102,8 @@ class gaussian_lstm(nn.Module):
         z = torch.stack([self.reparameterize(i, j) for i,j in zip(mu, logvar)])
         mu = torch.stack(mu)
         logvar = torch.stack(logvar)
+
+        if z.size()[0] == 1:
+            z = z.squeeze(0)
         return z, mu, logvar
             

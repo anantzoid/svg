@@ -303,3 +303,54 @@ class MultiScaleLoss(nn.Module):
         return _mse
 
 
+import torch.nn.functional as F
+import operator
+import functools
+class Laplacian(nn.Module):
+    def __init__(self):
+        super(Laplacian, self).__init__()
+
+    def gauss_kernel(self, size=5, sigma=1.0):
+        grid = np.float32(np.mgrid[0:size,0:size].T)
+        gaussian = lambda x: np.exp((x - size//2)**2/(-2*sigma**2))**2
+        kernel = np.sum(gaussian(grid), axis=2)
+        kernel /= np.sum(kernel)
+        return kernel
+
+    def conv_gauss(self, t_input, stride=1, k_size=5, sigma=1.6, repeats=1):
+        #kernel = np.array(([self.gauss_kernel(k_size, sigma)]*9)).reshape(3,3,k_size,k_size)
+        #kernel = Variable(torch.from_numpy(kernel).cuda()).float()       
+        kernel = Variable(torch.from_numpy(self.gauss_kernel(k_size, sigma)).unsqueeze(0).unsqueeze(0)).cuda().float()
+        pyr = Variable(torch.FloatTensor(t_input.size())).cuda()
+        for i in range(3):
+             pyr[:, i,:,:] = F.conv2d(t_input[:, i,:,:].unsqueeze(1), kernel, padding=2).squeeze(1)
+        return pyr
+
+    def make_laplacian_pyramid(self, x, max_levels):
+        t_pyr = []
+        current = x
+        for level in range(max_levels):
+            t_gauss = self.conv_gauss(current, stride=1, k_size=5, sigma=2.0)
+            #save_tensors_image('diff.png', [current, t_gauss])
+            #save_tensors_image('current.png', current)
+            #save_tensors_image('gauss.png', t_gauss)
+            #exit()
+            t_diff = current - t_gauss
+            t_pyr.append(t_diff)
+            current = F.avg_pool2d(t_gauss, 2, 2)
+        t_pyr.append(current)
+        return t_pyr
+
+    def laploss(self, x_pred, x, max_levels=3):
+
+        t_pyr1 = self.make_laplacian_pyramid(x_pred, max_levels) 
+        t_pyr2 = self.make_laplacian_pyramid(x, max_levels)
+        #t_losses = [(a-b).norm(1)/float(functools.reduce(operator.mul, a.size())) for a,b in zip(t_pyr1, t_pyr2)]
+
+        t_losses = [(a-b).norm(1)*(2**(-2*(en+1)))/float(functools.reduce(operator.mul, a.size())) for en,(a,b) in enumerate(zip(t_pyr1, t_pyr2))]
+        return torch.sum(torch.cat(t_losses))#*x_pred.size()[0])
+    
+    def forward(self, x_pred, x):
+        return self.laploss(x_pred, x)
+
+

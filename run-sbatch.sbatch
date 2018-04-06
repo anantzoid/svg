@@ -1,15 +1,16 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=pw10
+#SBATCH --job-name=cont
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
-#SBATCH --gres=gpu:p100 -c1
+#SBATCH --gres=gpu:1 -c1
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
 module purge
+module load cuda/8.0.44
 #module load tensorflow/python2.7/20170707
 source activate env
 
@@ -143,7 +144,59 @@ source activate env
 #working command
 #python original_lp.py --dataset bair --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 2 --name temp --msloss 0 --batch_size 16 --epoch_size 10 --niter 1
 
-# 1/4
+# 4/1
+## weighted pixelwise mse --didn't work
 #python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw1  --batch_size 128 --pw 1
 #python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw5  --batch_size 128 --pw 5
-python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw10 --batch_size 128 --pw 10
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw10 --batch_size 128 --pw 10
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw0p1 --batch_size 128 --pw 0.1
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name pw0p01 --batch_size 128 --pw 0.01
+
+# 4/2
+#debugging the above
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 1 --name temp --batch_size 16 --pw 0.01 --model_dir logs2/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000pw0p1
+
+# 4/3
+##identity w/o lstms
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 1 --name identity_new --noskip 1
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity_new_hc --noskip 1 --batch_size 128 --model highcap
+
+# Masked on pretrained
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name masked0 --batch_size 128 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000orig0
+
+# on new lstms --sanity check experiment to see if highcapmsloss was correct
+# this should same results as orig
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name orig_check --orig_lstm 0 --mse 1 
+
+#laplacian loss on identity for checking
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2  --data_threads 10 --name identity_laplacian --noskip 1 --laplacian 1
+#decay factor added to norms in loss
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2  --data_threads 10 --name identity_laplacian1 --noskip 1 --laplacian 1
+
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name orig_lap1 --laplacian 1
+
+# 4/4
+# lowering the LR on hc identity --> not much difference
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name identity_new_hc1 --noskip 1 --batch_size 128 --model highcap --model_dir logs/bair/model=highcap64x64-rnn_size=256-rnn_layers=2-n_past=4-n_future=4-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000identity_new_hc --lr 3e-5
+
+# AE still not able to copy image, so i) use skip conn #duh, ii) bigger enc, dec, h  iii) just bigger decoder (as per objective)
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2  --data_threads 10 --name identity_laplacian_skipco  --laplacian 1 --model highcap
+
+#python identity.py --dataset bair --g_dim 256 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2  --data_threads 1 --name vgg1 --batch_size 64 --model vgg --noskip 1
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2  --data_threads 1 --name vgg2 --batch_size 64 --model vgg --noskip 1
+#with decay
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2  --data_threads 1 --name vgg3 --batch_size 128 --model vgg --noskip 1 --decay 1
+
+# results with old lr is all screwed up
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name origvgg --model vgg --batch_size 32
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name origvgglap --model vgg --batch_size 32 --laplacian 1
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name origvgg1 --model vgg --batch_size 32 --lr 0.0002
+
+# 4/5
+#python identity.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 4 --n_future 4 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2  --data_threads 1 --name vgg4 --batch_size 64 --model vgg --noskip 1 --lr 0.0002
+#training decoder more on best model
+# this didn't run as trained model didnt load--> error: decoder has changed.
+#python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name orig0_1 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000orig0 --lr 0.0002
+
+
+python original_lp.py --dataset bair --g_dim 128 --z_dim 64 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs2 --plot_dir plots2 --data_threads 10 --name origvgg1_1 --model vgg --batch_size 32 --lr 0.00002 --model_dir logs2/bair/model=vgg64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000origvgg1
