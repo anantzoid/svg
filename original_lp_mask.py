@@ -64,12 +64,19 @@ else:
     else:
         opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
 
+
 ###################
 ###################
-opt.name = 'masked_bairold'
 opt.mse = 0
-opt.log_dir = 'logs'
-opt.epoch_size = 10
+opt.log_dir = 'logs/pretrained_masked' 
+opt.name = 'pretrained_masked'
+opt.n_eval = 12
+opt.data_root = '/beegfs/ag4508/svg/' 
+
+
+###################
+###################
+
 
 os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
 os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
@@ -98,8 +105,7 @@ else:
     raise ValueError('Unknown optimizer: %s' % opt.optimizer)
 
 
-#import models.lstm as lstm_models
-import models.original_lstm as lstm_models
+import models.lstm as lstm_models
 if opt.model_dir != '':
     frame_predictor = saved_model['frame_predictor']
     posterior = saved_model['posterior']
@@ -112,9 +118,7 @@ else:
     posterior.apply(utils.init_weights)
     prior.apply(utils.init_weights)
 
-if opt.model == 'highcap':
-    import models.dcgan_64_high as model
-elif opt.model == 'dcgan':
+if opt.model == 'dcgan':
     if opt.image_width == 64:
         import models.dcgan_64 as model 
     elif opt.image_width == 128:
@@ -135,7 +139,6 @@ else:
     decoder = model.decoder(opt.g_dim, opt.channels)
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
-
 '''
 print("======Encoder==========")
 print(encoder)
@@ -160,6 +163,7 @@ decoder_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.be
 mse_criterion = nn.MSELoss()
 if opt.mse == 0:
     pixel_mse_criterion = nn.MSELoss(reduce=False)
+    pixel_mse_criterion.cuda()
 
 def kl_criterion(mu1, logvar1, mu2, logvar2):
     # KL( N(mu_1, sigma2_1) || N(mu_2, sigma2_2)) = 
@@ -210,16 +214,20 @@ testing_batch_generator = get_testing_batch()
 
 # --------- plotting funtions ------------------------------------
 def plot(x, epoch):
-    nsample = 20 
+    nsample = 5 
     gen_seq = [[] for i in range(nsample)]
     gt_seq = [x[i] for i in range(len(x))]
 
+    mean_ssim, mean_psnr = [], []
     for s in range(nsample):
         frame_predictor.hidden = frame_predictor.init_hidden()
         posterior.hidden = posterior.init_hidden()
         prior.hidden = prior.init_hidden()
         gen_seq[s].append(x[0])
         x_in = x[0]
+
+        tempgt_seq, temppred_seq = [], []
+
         for i in range(1, opt.n_eval):
             h = encoder(x_in)
             if opt.last_frame_skip or i < opt.n_past:	
@@ -240,6 +248,18 @@ def plot(x, epoch):
                 x_in = decoder([h, skip]).detach()
                 gen_seq[s].append(x_in)
 
+                try:
+                    temppred_seq.append(x_in.data.cpu().numpy())
+                    tempgt_seq.append(x[i].data.cpu().numpy())
+                except:
+                    print("here")
+                    pass
+
+        _, ssim, psnr = utils.eval_seq(tempgt_seq, temppred_seq)
+        mean_ssim.append(np.mean(ssim, axis=0)[-1])
+        mean_psnr.append(np.mean(psnr, axis=0)[-1])
+    return np.mean(mean_ssim), np.mean(mean_psnr)
+    '''
     to_plot = []
     gifs = [ [] for t in range(opt.n_eval) ]
     nrow = min(opt.batch_size, 10)
@@ -284,12 +304,13 @@ def plot(x, epoch):
 
     fname = '%s/gen/sample_%d.gif' % (opt.log_dir, epoch) 
     utils.save_gif(fname, gifs)
+    '''
 
 
 def plot_rec(x, epoch, _type):
     frame_predictor.hidden = frame_predictor.init_hidden()
     posterior.hidden = posterior.init_hidden()
-    gen_seq = []
+    gen_seq, gt_seq, pred_seq = [], [], []
     gen_seq.append(x[0])
     x_in = x[0]
     for i in range(1, opt.n_past+opt.n_future):
@@ -310,8 +331,11 @@ def plot_rec(x, epoch, _type):
             h_pred = frame_predictor(torch.cat([h, z_t], 1))
             x_pred = decoder([h_pred, skip]).detach()
             gen_seq.append(x_pred)
+            pred_seq.append(x_pred.data.cpu().numpy())
+            gt_seq.append(x[i].data.cpu().numpy())
+
     _, ssim, psnr = utils.eval_seq(gt_seq, pred_seq)
-   
+    ''' 
     to_plot = []
     nrow = min(opt.batch_size, 10)
     for i in range(nrow):
@@ -321,6 +345,7 @@ def plot_rec(x, epoch, _type):
         to_plot.append(row)
     fname = '%s/gen/%s_rec_%d.png' % (opt.log_dir, _type, epoch) 
     utils.save_tensors_image(fname, to_plot)
+    ''' 
     
     return np.mean(ssim, axis=0), np.mean(psnr, axis=0)
 
@@ -339,6 +364,7 @@ def train(x):
 
     mse = 0
     kld = 0
+
     for i in range(1, opt.n_past+opt.n_future):
         h = encoder(x[i-1])
         h_target = encoder(x[i])[0]
@@ -350,8 +376,10 @@ def train(x):
         _, mu_p, logvar_p = prior(h)
         h_pred = frame_predictor(torch.cat([h, z_t], 1))
         x_pred = decoder([h_pred, skip])
+
         if opt.mse == 1:
             mse += mse_criterion(x_pred, x[i])
+            _m = mse
         else:
             pmse = pixel_mse_criterion(x_pred, x[i])
             _m = mse_criterion(x_pred, x[i])
@@ -359,6 +387,7 @@ def train(x):
             pixel_weights = Variable(torch.zeros(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
             pixel_weights = pixel_weights.cuda()
             pixel_weights[pmse.data > _m.data] = 1.0
+            mse += torch.mean(pmse.mul(pixel_weights.detach()))
 
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
 
@@ -371,9 +400,7 @@ def train(x):
     encoder_optimizer.step()
     decoder_optimizer.step()
 
-
-    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
-
+    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past), _m
 # --------- training loop ------------------------------------
 for epoch in range(opt.niter):
     frame_predictor.train()
@@ -383,23 +410,28 @@ for epoch in range(opt.niter):
     decoder.train()
     epoch_mse = 0
     epoch_kld = 0
+    epoch__mse = 0
+
     #progress = progressbar.ProgressBar(max_value=opt.epoch_size).start()
     for i in range(opt.epoch_size):
         #progress.update(i+1)
         x = next(training_batch_generator)
 
         # train frame_predictor 
-        mse, kld = train(x)
+        mse, kld, _mse = train(x)
         epoch_mse += mse
         epoch_kld += kld
+        epoch__mse += _mse
 
 
     #progress.finish()
-    utils.clear_progressbar()
+    #utils.clear_progressbar()
 
-    print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
+    #print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
+    print('[%02d] mse loss: %.5f | kld loss: %.5f | true_mse loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch__mse/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
+    writer.add_scalar('true_mse', epoch__mse/opt.epoch_size, epoch)
 
     # plot some stuff
     frame_predictor.eval()
@@ -407,13 +439,18 @@ for epoch in range(opt.niter):
     decoder.eval()
     posterior.eval()
     prior.eval()
-   
+    
+    #### NOTE uncomment this line while only eval
+    #x = next(training_batch_generator)
     ssim, psnr = plot_rec(x, epoch, 'train')
-    print("Train ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
+    print("recon Train ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
+    ssim, psnr = plot(x, epoch)
+    print("gen Train ssim: %.4f, psnr: %.4f"%(ssim, psnr))
     x = next(testing_batch_generator)
-    #plot(x, epoch)
     ssim, psnr = plot_rec(x, epoch, 'test')
-    print("Test ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
+    print("recon Test ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
+    ssim, psnr = plot(x, epoch)
+    print("gen Test ssim: %.4f, psnr: %.4f"%(ssim, psnr))
 
     # save the model
     torch.save({
@@ -440,4 +477,7 @@ for epoch in range(opt.niter):
         param_group['lr'] = lr
     for param_group in decoder_optimizer.param_groups:
         param_group['lr'] = lr
+
+    if lr < 1e-6:
+        exit()
 
