@@ -1,7 +1,3 @@
-#### ORIGINAL script
-# with option for high capacity enc-dec and LR decay (hard-coded)
-# and using oringinal lstm models
-
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -43,8 +39,10 @@ parser.add_argument('--model', default='dcgan', help='model type (dcgan | vgg)')
 parser.add_argument('--data_threads', type=int, default=5, help='number of data loading threads')
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
-parser.add_argument('--mse', default=0, help='use mse else use masked mse loss')
 
+parser.add_argument('--advbeta', type=float, default=0.01, help='weighting on KL to prior')
+parser.add_argument('--advframes', type=int, default=4, help='weighting on KL to prior')
+parser.add_argument('--diters', type=int, default=1, help='weighting on KL to prior')
 
 
 opt = parser.parse_args()
@@ -64,12 +62,15 @@ else:
     else:
         opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
 
-###################
-###################
-opt.name = 'masked_bairold'
-opt.mse = 0
-opt.log_dir = 'logs'
-opt.epoch_size = 10
+
+#######################3
+#######################3
+#opt.name = 'temp'
+#opt.batch_size = 16
+#opt.data_threads = 1
+#######################3
+#######################3
+
 
 os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
 os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
@@ -112,9 +113,7 @@ else:
     posterior.apply(utils.init_weights)
     prior.apply(utils.init_weights)
 
-if opt.model == 'highcap':
-    import models.dcgan_64_high as model
-elif opt.model == 'dcgan':
+if opt.model == 'dcgan':
     if opt.image_width == 64:
         import models.dcgan_64 as model 
     elif opt.image_width == 128:
@@ -136,31 +135,28 @@ else:
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
 
-'''
-print("======Encoder==========")
-print(encoder)
-print("======Predictor==========")
-print(frame_predictor)
-print("======Decoder==========")
-print(decoder)
-print("======Posterior==========")
-print(posterior)
-print("======Prior==========")
-print(prior)
-exit()
-'''
+
+###adversaraial###
+from models.discriminator import Discriminator
+if opt.model_dir != '':
+    disc = saved_model['disc'] 
+else:
+    disc = Discriminator(opt.advframes * opt.channels) 
+    disc.apply(utils.init_weights)
+disc.cuda()
+adv_crit = nn.BCELoss()
+adv_crit.cuda()
+############
 
 frame_predictor_optimizer = opt.optimizer(frame_predictor.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 posterior_optimizer = opt.optimizer(posterior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 prior_optimizer = opt.optimizer(prior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 encoder_optimizer = opt.optimizer(encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 decoder_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+disc_optimizer = opt.optimizer(disc.parameters(),  lr=opt.lr, betas=(opt.beta1, 0.999))
 
 # --------- loss functions ------------------------------------
 mse_criterion = nn.MSELoss()
-if opt.mse == 0:
-    pixel_mse_criterion = nn.MSELoss(reduce=False)
-
 def kl_criterion(mu1, logvar1, mu2, logvar2):
     # KL( N(mu_1, sigma2_1) || N(mu_2, sigma2_2)) = 
     #   log( sqrt(
@@ -310,7 +306,6 @@ def plot_rec(x, epoch, _type):
             h_pred = frame_predictor(torch.cat([h, z_t], 1))
             x_pred = decoder([h_pred, skip]).detach()
             gen_seq.append(x_pred)
-    _, ssim, psnr = utils.eval_seq(gt_seq, pred_seq)
    
     to_plot = []
     nrow = min(opt.batch_size, 10)
@@ -321,24 +316,77 @@ def plot_rec(x, epoch, _type):
         to_plot.append(row)
     fname = '%s/gen/%s_rec_%d.png' % (opt.log_dir, _type, epoch) 
     utils.save_tensors_image(fname, to_plot)
-    
-    return np.mean(ssim, axis=0), np.mean(psnr, axis=0)
+
 
 # --------- training funtions ------------------------------------
 def train(x):
+    label = Variable(torch.FloatTensor(opt.batch_size).cuda())
+    mse = 0
+    kld = 0
+    lossG, lossD = 0, 0
+
+    #### D Update
+    for diter in range(opt.diters):
+        lossD = 0
+        frame_predictor.zero_grad()
+        posterior.zero_grad()
+        prior.zero_grad()
+        encoder.zero_grad()
+        decoder.zero_grad()
+        disc.zero_grad()
+
+        frame_predictor.hidden = frame_predictor.init_hidden()
+        posterior.hidden = posterior.init_hidden()
+        prior.hidden = prior.init_hidden()
+
+        for i in range(1, opt.n_past+opt.n_future):
+            h = encoder(x[i-1])
+            h_target = encoder(x[i])[0]
+            if opt.last_frame_skip or i < opt.n_past:	
+                h, skip = h
+            else:
+                h = h[0]
+
+            z_t, mu, logvar = posterior(h_target)
+            _, mu_p, logvar_p = prior(h)
+            h_pred = frame_predictor(torch.cat([h, z_t], 1))
+            x_pred = decoder([h_pred, skip])
+
+            if i >= opt.advframes-1:
+                real_op = disc(torch.cat(x[i-opt.advframes+1:i+1], 1))
+                fake_op = disc(torch.cat(x[i-opt.advframes+1:i] + [x_pred.detach()], 1))
+                #real_op = disc(x[i])
+                #fake_op = disc(x_pred.detach())
+
+                lossD += -(torch.mean(real_op) - torch.mean(fake_op))
+                '''
+                label.data.fill_(1)
+                real = adv_crit(real_op, label)
+                label.data.fill_(0)
+                fake = adv_crit(fake_op, label)
+                lossD += real + fake
+                #break
+                '''
+
+        loss = opt.advbeta*(lossD)
+        loss.backward()
+        disc_optimizer.step()
+        for p in disc.parameters():
+            p.data.clamp_(-0.01, 0.01)
+
+
+    ##### G Update
     frame_predictor.zero_grad()
     posterior.zero_grad()
     prior.zero_grad()
     encoder.zero_grad()
     decoder.zero_grad()
+    disc.zero_grad()
 
-    # initialize the hidden state.
     frame_predictor.hidden = frame_predictor.init_hidden()
     posterior.hidden = posterior.init_hidden()
     prior.hidden = prior.init_hidden()
 
-    mse = 0
-    kld = 0
     for i in range(1, opt.n_past+opt.n_future):
         h = encoder(x[i-1])
         h_target = encoder(x[i])[0]
@@ -346,23 +394,23 @@ def train(x):
             h, skip = h
         else:
             h = h[0]
+
         z_t, mu, logvar = posterior(h_target)
         _, mu_p, logvar_p = prior(h)
         h_pred = frame_predictor(torch.cat([h, z_t], 1))
         x_pred = decoder([h_pred, skip])
-        if opt.mse == 1:
-            mse += mse_criterion(x_pred, x[i])
-        else:
-            pmse = pixel_mse_criterion(x_pred, x[i])
-            _m = mse_criterion(x_pred, x[i])
-            #note: temp. refactor later
-            pixel_weights = Variable(torch.zeros(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
-            pixel_weights = pixel_weights.cuda()
-            pixel_weights[pmse.data > _m.data] = 1.0
 
+        mse += mse_criterion(x_pred, x[i])
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
+        if i >= opt.advframes-1:
+            g_op = disc(torch.cat(x[i-opt.advframes+1:i] + [x_pred], 1))
+            label.data.fill_(1)
+            lossG += -torch.mean(g_op)
+            #lossG += adv_crit(g_op, label)
+            #break
 
-    loss = mse + kld*opt.beta
+
+    loss = mse + kld*opt.beta + opt.advbeta*(lossG)
     loss.backward()
 
     frame_predictor_optimizer.step()
@@ -372,7 +420,14 @@ def train(x):
     decoder_optimizer.step()
 
 
-    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
+    _losses = (mse.data.cpu().numpy()/(opt.n_past+opt.n_future),
+                kld.data.cpu().numpy()/(opt.n_future+opt.n_past),
+                lossD.data.cpu().numpy()/(opt.n_future+opt.n_past),
+                lossG.data.cpu().numpy()/(opt.n_future+opt.n_past),
+                (real_op, fake_op, g_op)
+            )
+    return _losses
+    #return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past)
 
 # --------- training loop ------------------------------------
 for epoch in range(opt.niter):
@@ -383,23 +438,42 @@ for epoch in range(opt.niter):
     decoder.train()
     epoch_mse = 0
     epoch_kld = 0
+    epoch_d = 0
+    epoch_g = 0
     #progress = progressbar.ProgressBar(max_value=opt.epoch_size).start()
     for i in range(opt.epoch_size):
         #progress.update(i+1)
         x = next(training_batch_generator)
 
         # train frame_predictor 
-        mse, kld = train(x)
+        mse, kld, d, g, disc_op = train(x)
         epoch_mse += mse
         epoch_kld += kld
+        epoch_d += d
+        epoch_g += g
 
+    print('[%02d] mse loss: %.5f | kld loss: %.5f | d loss: %.5f | g loss: %.5f (%d)' % (epoch, 
+                    epoch_mse/opt.epoch_size, 
+                    epoch_kld/opt.epoch_size,
+                    epoch_d/opt.epoch_size,
+                    epoch_g/opt.epoch_size,
+                    epoch*opt.epoch_size*opt.batch_size))
+
+    #if epoch % 10 == 0:
+    print("============D Real==========")
+    print(disc_op[0][:15])
+    print("============D Fake==========")
+    print(disc_op[1][:15])
+    print("============G==========")
+    print(disc_op[2][:15])
 
     #progress.finish()
-    utils.clear_progressbar()
+    #utils.clear_progressbar()
 
-    print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
+    writer.add_scalar('D', epoch_d/opt.epoch_size, epoch)
+    writer.add_scalar('G', epoch_g/opt.epoch_size, epoch)
 
     # plot some stuff
     frame_predictor.eval()
@@ -407,13 +481,11 @@ for epoch in range(opt.niter):
     decoder.eval()
     posterior.eval()
     prior.eval()
-   
-    ssim, psnr = plot_rec(x, epoch, 'train')
-    print("Train ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
+    
+    plot_rec(x, epoch, 'train')
     x = next(testing_batch_generator)
     #plot(x, epoch)
-    ssim, psnr = plot_rec(x, epoch, 'test')
-    print("Test ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
+    plot_rec(x, epoch, 'test')
 
     # save the model
     torch.save({
@@ -422,22 +494,10 @@ for epoch in range(opt.niter):
         'frame_predictor': frame_predictor,
         'posterior': posterior,
         'prior': prior,
+        'disc': disc,
         'opt': opt},
         '%s/model.pth' % opt.log_dir)
     if epoch % 10 == 0:
         print('log dir: %s' % opt.log_dir)
-
-
-    lr = opt.lr * (0.1 ** (epoch // 30))
-    print("LR changed to: ", lr)
-    for param_group in frame_predictor_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in posterior_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in prior_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in encoder_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in decoder_optimizer.param_groups:
-        param_group['lr'] = lr
+        
 

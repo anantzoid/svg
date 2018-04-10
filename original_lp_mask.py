@@ -335,7 +335,6 @@ def plot_rec(x, epoch, _type):
             gt_seq.append(x[i].data.cpu().numpy())
 
     _, ssim, psnr = utils.eval_seq(gt_seq, pred_seq)
-    ''' 
     to_plot = []
     nrow = min(opt.batch_size, 10)
     for i in range(nrow):
@@ -345,7 +344,6 @@ def plot_rec(x, epoch, _type):
         to_plot.append(row)
     fname = '%s/gen/%s_rec_%d.png' % (opt.log_dir, _type, epoch) 
     utils.save_tensors_image(fname, to_plot)
-    ''' 
     
     return np.mean(ssim, axis=0), np.mean(psnr, axis=0)
 

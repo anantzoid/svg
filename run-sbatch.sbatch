@@ -1,17 +1,17 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=high2
-#SBATCH --time=10:00:00
+#SBATCH --job-name=wgan2
+#SBATCH --time=30:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=100GB
+#SBATCH --mem=50GB
 #SBATCH --gres=gpu:1 -c1
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
 module purge
 #module load tensorflow/python3.6/1.5.0
-source activate env1
+source activate env
 
 #python train_svg_lp.py --dataset smmnist --num_digits 2 --g_dim 128 --z_dim 10 --beta 0.0001 --data_root data/mnist --log_dir logs --name mnist_lp_original
 #python generate_svg_lp.py --model_path pretrain_models/svglp_bair.pth --log_dir pretrained_lp --data_root /scratch/ag4508/svg --dataset bair --z_dim 10 --g_dim 128
@@ -64,4 +64,23 @@ source activate env1
 ##run above with kl 0
 #python original_lp.py --dataset bair --g_dim 256 --z_dim 128 --beta 0 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name bairbilstm14 --rnn_size 512 --lr 0.01 --model highcap
 
-python generate_svg_lp.py --data_root /beegfs/ag4508/svg/ --dataset bair --batch_size 50 --log_dir logs2/orig_lap1 --model_path logs2/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000orig_lap1/model.pth
+#python generate_svg_lp.py --data_root /beegfs/ag4508/svg/ --dataset bair --batch_size 50 --log_dir logs2/orig_lap1 --model_path logs2/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000orig_lap1/model.pth
+
+
+# 4/7
+#python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name adv1 --advbeta 0.01
+#python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name adv2 --advbeta 0.1
+#factor w as per UNIT
+#python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name adv3 --advbeta 0.1 --lr 0.0001 --batch_size 128 --beta 0.001 
+
+#training adv1 again as that was not saved & also had a bug
+#python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name adv0 --advbeta 0.01
+#python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name adv4 --advbeta 0.01 --advframes 2
+## choose adv. factor to 0.1; 0.01 blows up D loss and 0s out G loss
+
+## WGAN!
+# returns clf in Disc. 
+#test lr 2e-3, 2e-4, 5e-5. adam or rms, Diter
+#python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name wgan0 --advbeta 0.01 --advframes 3 
+#python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name wgan1 --advbeta 0.01 --advframes 3  --diters 5
+python adv_scheme1.py --dataset bair --g_dim 128 --z_dim 64 --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs --data_threads 10 --name wgan2 --advbeta 0.1 --advframes 3
