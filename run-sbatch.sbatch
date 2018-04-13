@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=hlm4
-#SBATCH --time=30:00:00
+#SBATCH --job-name=hlm6
+#SBATCH --time=100:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --gres=gpu:1 -c1
@@ -74,4 +74,12 @@ source activate env
 #python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 1 --name hlm3 --model_dir pretrain_models --beta2 0.0001 --rec1 0.1 --beta 0.0001 --joint 1
 
 # 4/11
-python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm4  --beta2 0.0001 --rec1 1 --beta 0.0001 --joint 1
+#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm4  --beta2 0.0001 --rec1 1 --beta 0.0001 --joint 1
+
+
+# 4/13
+# encoder, decoder is same in L2 heirarchy
+# dec(h +lin(z)
+#python hlm1.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm5 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1 --beta2 0 --rec1 0 --beta 0 --joint 0
+#L1 variant
+python hlm1.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm6 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1 --beta2 0 --rec1 0 --beta 0 --joint 0 --l1 1
