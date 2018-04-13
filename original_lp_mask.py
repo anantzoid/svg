@@ -68,8 +68,10 @@ else:
 ###################
 ###################
 opt.mse = 0
-opt.log_dir = 'logs/pretrained_masked' 
-opt.name = 'pretrained_masked'
+#opt.log_dir = 'logs/bair/masked_check' 
+#opt.name = 'masked_check'
+opt.log_dir = 'logs/bair/masked_checkl1' 
+opt.name = 'masked_checkl1'
 opt.n_eval = 12
 opt.data_root = '/beegfs/ag4508/svg/' 
 
@@ -105,7 +107,8 @@ else:
     raise ValueError('Unknown optimizer: %s' % opt.optimizer)
 
 
-import models.lstm as lstm_models
+#import models.lstm as lstm_models
+import models.original_lstm as lstm_models
 if opt.model_dir != '':
     frame_predictor = saved_model['frame_predictor']
     posterior = saved_model['posterior']
@@ -160,9 +163,11 @@ encoder_optimizer = opt.optimizer(encoder.parameters(), lr=opt.lr, betas=(opt.be
 decoder_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
 # --------- loss functions ------------------------------------
-mse_criterion = nn.MSELoss()
+#mse_criterion = nn.MSELoss()
+mse_criterion = nn.L1Loss()
 if opt.mse == 0:
-    pixel_mse_criterion = nn.MSELoss(reduce=False)
+    #pixel_mse_criterion = nn.MSELoss(reduce=False)
+    pixel_mse_criterion = nn.L1Loss(reduce=False)
     pixel_mse_criterion.cuda()
 
 def kl_criterion(mu1, logvar1, mu2, logvar2):
@@ -429,6 +434,7 @@ for epoch in range(opt.niter):
 
     #print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
     print('[%02d] mse loss: %.5f | kld loss: %.5f | true_mse loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch__mse/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
+    '''
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
     writer.add_scalar('true_mse', epoch__mse/opt.epoch_size, epoch)
@@ -481,3 +487,4 @@ for epoch in range(opt.niter):
     if lr < 1e-6:
         exit()
 
+    '''

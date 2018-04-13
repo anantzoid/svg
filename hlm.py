@@ -45,8 +45,8 @@ parser.add_argument('--num_digits', type=int, default=2, help='number of digits 
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 
 
-parser.add_argument('--rec1', type=int, default=0, help='mse 1st part')
-parser.add_argument('--beta2', type=int, default=0, help='kld 2nd part')
+parser.add_argument('--rec1', type=float, default=0, help='mse 1st part')
+parser.add_argument('--beta2', type=float, default=0, help='kld 2nd part')
 parser.add_argument('--load_all', type=int, default=0, help='load both models')
 parser.add_argument('--joint', type=int, default=0, help='backprop from L2 to L1')
 
@@ -234,7 +234,10 @@ testing_batch_generator = get_testing_batch()
 def plot_rec(x, epoch, _type):
     frame_predictor.hidden = frame_predictor.init_hidden()
     posterior.hidden = posterior.init_hidden()
-    gen_seq = []
+
+    posterior_2.hidden = posterior_2.init_hidden()
+
+    gen_seq, gt_seq, pred_seq = [], [], []
     gen_seq.append(x[0])
     x_in = x[0]
     for i in range(1, opt.n_past+opt.n_future):
@@ -249,12 +252,19 @@ def plot_rec(x, epoch, _type):
         h_target = h_target.detach()
         z_t, _, _= posterior(h_target)
         if i < opt.n_past:
-            frame_predictor(torch.cat([h, z_t], 1)) 
             gen_seq.append(x[i])
         else:
             h_pred = frame_predictor(torch.cat([h, z_t], 1))
             x_pred = decoder([h_pred, skip]).detach()
-            gen_seq.append(x_pred)
+            
+            x_pred_h = pred_encoder(x_pred)[0]
+            x_pred_h.detach()
+            z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
+            x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
+
+            gen_seq.append(x_pred_2)
+            gt_seq.append(x[i].data.cpu().numpy())
+            pred_seq.append(x_pred_2.data.cpu().numpy())
     _, ssim, psnr = utils.eval_seq(gt_seq, pred_seq)
    
     to_plot = []
@@ -316,9 +326,9 @@ def train(x):
             h = h.detach()
             z_t = z_t.detach()
 
-        h_pred = pred_encoder(x_pred)[0]
+        x_pred_h = pred_encoder(x_pred)[0]
         z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
-        x_pred_2 = pred_decoder([torch.cat([h_pred, z_t_2], 1), skip])
+        x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
 
         _, mu_p_2, logvar_p_2 = prior_2(torch.cat([h, z_t], 1))
 
@@ -393,7 +403,6 @@ for epoch in range(opt.niter):
     writer.add_scalar('mse_2', epoch_mse_2/opt.epoch_size, epoch)
     writer.add_scalar('kld_2', epoch_kld_2/opt.epoch_size, epoch)
     
-    '''
     # plot some stuff
     frame_predictor.eval()
     encoder.eval()
@@ -401,10 +410,10 @@ for epoch in range(opt.niter):
     posterior.eval()
     prior.eval()
    
-    encoder.eval()
-    decoder.eval()
-    posterior.eval()
-    prior.eval()
+    pred_encoder.eval()
+    pred_decoder.eval()
+    posterior_2.eval()
+    prior_2.eval()
 
     ssim, psnr = plot_rec(x, epoch, 'train')
     print("Train ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
@@ -412,7 +421,6 @@ for epoch in range(opt.niter):
     #plot(x, epoch)
     ssim, psnr = plot_rec(x, epoch, 'test')
     print("Test ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
-    '''
 
     # save the model
     torch.save({
