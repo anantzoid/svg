@@ -111,6 +111,7 @@ else:
 if opt.load_all == 1:
     posterior_2 = saved_model['posterior_2']
     prior_2 = saved_model['prior_2']
+    latent_encoder = saved_model['latent_encoder']
 else:
     posterior_2 = lstm_models.gaussian_lstm(opt.g_dim+opt.z_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
     prior_2 = lstm_models.gaussian_lstm(opt.g_dim+opt.z_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
@@ -430,18 +431,16 @@ for epoch in range(opt.niter):
     if epoch % 10 == 0:
         print('log dir: %s' % opt.log_dir)
 
-    ''' 
-    lr = opt.lr * (0.1 ** (epoch // 30))
-    print("LR changed to: ", lr)
-    for param_group in frame_predictor_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in posterior_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in prior_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in encoder_optimizer.param_groups:
-        param_group['lr'] = lr
-    for param_group in decoder_optimizer.param_groups:
-        param_group['lr'] = lr
-
-    ''' 
+    if opt.l1 ==  1:
+        lr = opt.lr * (0.1 ** (epoch // 100))
+        print("LR changed to: ", lr)
+        for param_group in frame_predictor_optimizer.param_groups:
+            param_group['lr'] = lr
+        for param_group in posterior_optimizer.param_groups:
+            param_group['lr'] = lr
+        for param_group in prior_optimizer.param_groups:
+            param_group['lr'] = lr
+        for param_group in encoder_optimizer.param_groups:
+            param_group['lr'] = lr
+        for param_group in decoder_optimizer.param_groups:
+            param_group['lr'] = lr

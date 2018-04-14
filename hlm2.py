@@ -108,18 +108,8 @@ else:
     posterior.apply(utils.init_weights)
     prior.apply(utils.init_weights)
 
-if opt.load_all == 1:
-    posterior_2 = saved_model['posterior_2']
-    prior_2 = saved_model['prior_2']
-else:
-    posterior_2 = lstm_models.gaussian_lstm(opt.g_dim+opt.z_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
-    prior_2 = lstm_models.gaussian_lstm(opt.g_dim+opt.z_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
-    posterior.apply(utils.init_weights)
-    prior.apply(utils.init_weights)
-    latent_encoder =  nn.Linear(opt.z_dim, opt.g_dim)
-    latent_encoder.apply(utils.init_weights)
 
-    phi_network_conv = model.encoder(opt.g_dim, opt.channels) 
+
 
 if opt.model == 'highcap':
     import models.dcgan_64_high as model
@@ -145,7 +135,19 @@ else:
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
 
+if opt.load_all == 1:
+    pred_encoder = saved_model['pred_encoder']
+    pred_decoder = saved_model['pred_decoder']
+    latent_encoder = saved_model['latent_encoder']
+else:
+    pred_encoder = model.encoder(opt.g_dim, opt.channels)
+    pred_decoder = model.decoder(opt.g_dim, opt.channels)
+    #### Preload weights #####
+    pred_encoder.load_state_dict(encoder.state_dict())
+    pred_decoder.load_state_dict(decoder.state_dict())
 
+    latent_encoder =  model.ErrorEncoder(opt.g_dim, opt.channels )
+    latent_encoder.apply(utils.init_weights)
 
 '''
 print("======Encoder==========")
@@ -167,13 +169,9 @@ prior_optimizer = opt.optimizer(prior.parameters(), lr=opt.lr, betas=(opt.beta1,
 encoder_optimizer = opt.optimizer(encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 decoder_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
-
-#posterior_2_optimizer = opt.optimizer(posterior_2.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-#prior_2_optimizer = opt.optimizer(prior_2.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-#latent_encoder_optimizer = opt.optimizer(latent_encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-
-phi_network_conv_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-phi_network_fc_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+pred_encoder_optimizer = opt.optimizer(pred_encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+pred_decoder_optimizer = opt.optimizer(pred_decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+latent_encoder_optimizer = opt.optimizer(latent_encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
 # --------- loss functions ------------------------------------
 if opt.l1 == 1:
@@ -198,11 +196,9 @@ encoder.cuda()
 decoder.cuda()
 mse_criterion.cuda()
 
-#posterior_2.cuda()
-#prior_2.cuda()
-#latent_encoder.cuda()
-phi_network_conv.cuda()
-phi_network_fc.cuda()
+pred_encoder.cuda()
+pred_decoder.cuda()
+latent_encoder.cuda()
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
 
@@ -237,8 +233,6 @@ def plot_rec(x, epoch, _type):
     frame_predictor.hidden = frame_predictor.init_hidden()
     posterior.hidden = posterior.init_hidden()
 
-    posterior_2.hidden = posterior_2.init_hidden()
-
     gen_seq, gt_seq, pred_seq = [], [], []
     gen_seq.append(x[0])
     x_in = x[0]
@@ -259,11 +253,19 @@ def plot_rec(x, epoch, _type):
             h_pred = frame_predictor(torch.cat([h, z_t], 1))
             x_pred = decoder([h_pred, skip]).detach()
             
-            x_pred_h = encoder(x_pred)[0]
-            x_pred_h.detach()
-            z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
-            x_pred_2 = decoder([x_pred_h + latent_encoder(z_t_2), skip])
 
+            ###Level 2
+            residual = x[i] - Variable(x_pred.data)
+            latent = latent_encoder(residual)
+            h_2 = pred_encoder(Variable(x_pred.data))
+            if opt.last_frame_skip or i < opt.n_past:	
+                h_2, skip_2 = h_2
+            else:
+                h_2 = h_2[0]
+
+            x_pred_2 = pred_decoder([h_2 + latent, skip_2])
+    
+        
             gen_seq.append(x_pred_2)
             gt_seq.append(x[i].data.cpu().numpy())
             pred_seq.append(x_pred_2.data.cpu().numpy())
@@ -289,17 +291,14 @@ def train(x):
     encoder.zero_grad()
     decoder.zero_grad()
 
-    #posterior_2.zero_grad()
-    #prior_2.zero_grad()
-    phi_network_fc.zero_grad()
-    phi_network_conv.zero_grad()
+    latent_encoder.zero_grad()
+    pred_encoder.zero_grad()
+    pred_decoder.zero_grad()
 
     # initialize the hidden state.
     frame_predictor.hidden = frame_predictor.init_hidden()
     posterior.hidden = posterior.init_hidden()
     prior.hidden = prior.init_hidden()
-    #posterior_2.hidden = posterior_2.init_hidden()
-    #prior_2.hidden = prior_2.init_hidden()
 
     mse = 0
     kld = 0
@@ -320,35 +319,23 @@ def train(x):
         mse += mse_criterion(x_pred, x[i])
         kld += kl_criterion(mu, logvar, mu_p, logvar_p)
 
-
-
-        residual = x[i] - x_pred
-        z = phi_network_fc(phi_network_conv(residual).view(opt.batch_size, -1))
-        x_pred_v = Variable(x_pred.data)
-        x_pred_h = encoder(x_pred_v)[0]
-        x_pred_2 = decoder([x_pred_h + z, skip])
-         
-        '''
-        # 2nd level hierarchy
         if opt.joint == 0:
-            #repackage vars
-            x_pred_v = Variable(x_pred.data)
-            h_target_v = Variable(h_target.data)
-            skip_v = [Variable(_.data) for _ in skip]
-            h_v = Variable(h.data)
-            z_t_v = Variable(z_t.data)
+            x_pred = Variable(x_pred.data)
 
-        x_pred_h = encoder(x_pred_v)[0]
-        z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target_v, z_t_v], 1))
-        x_pred_2 = decoder([x_pred_h + latent_encoder(z_t_2), skip])
-        _, mu_p_2, logvar_p_2 = prior_2(torch.cat([h_v, z_t_v], 1))
-        kld_2 += kl_criterion(mu_2, logvar_2, mu_p_2, logvar_p_2)
-        '''
+        ###Level 2
+        residual = x[i] - Variable(x_pred.data)
+        latent = latent_encoder(residual)
+        h_2 = pred_encoder(x_pred)
+        if opt.last_frame_skip or i < opt.n_past:	
+            h_2, skip_2 = h_2
+        else:
+            h_2 = h_2[0]
 
+        x_pred_2 = pred_decoder([h_2 + latent, skip_2])
         mse_2 += mse_criterion(x_pred_2, x[i])
 
 
-    loss = opt.rec1*mse + kld*opt.beta + mse_2 + kld_2*opt.beta2
+    loss = opt.rec1*mse + kld*opt.beta + mse_2
     loss.backward()
 
     frame_predictor_optimizer.step()
@@ -357,15 +344,14 @@ def train(x):
     decoder_optimizer.step()
     encoder_optimizer.step()
 
-    posterior_2_optimizer.step()
-    prior_2_optimizer.step()
-
+    pred_decoder_optimizer.step()
+    pred_encoder_optimizer.step()
+    latent_encoder_optimizer.step()
 
     _losses = (
            mse.data.cpu().numpy()/(opt.n_past+opt.n_future),
            kld.data.cpu().numpy()/(opt.n_past+opt.n_future),
-           mse_2.data.cpu().numpy()/(opt.n_past+opt.n_future),
-           kld_2.data.cpu().numpy()/(opt.n_past+opt.n_future),
+           mse_2.data.cpu().numpy()/(opt.n_past+opt.n_future)
            )
     return _losses
 
@@ -378,9 +364,10 @@ for epoch in range(opt.niter):
     prior.train()
     encoder.train()
     decoder.train()
-
-    posterior_2.train()
-    prior_2.train()
+        
+    pred_encoder.train()
+    pred_decoder.train()
+    latent_encoder.train()
 
     epoch_mse = 0
     epoch_kld = 0
@@ -393,23 +380,22 @@ for epoch in range(opt.niter):
         x = next(training_batch_generator)
 
         # train frame_predictor 
-        mse, kld, mse_2, kld_2 = train(x)
+        mse, kld, mse_2 = train(x)
         epoch_mse += mse
         epoch_kld += kld
         epoch_mse_2 += mse_2
         epoch_kld_2 += kld_2
 
 
-    print('[%02d] mse loss: %.5f | kld loss: %.5f | mse_2 loss: %.5f | kld_2 loss: %.5f (%d)' % (epoch, 
+    print('[%02d] mse loss: %.5f | kld loss: %.5f | mse_2 loss: %.5f  (%d)' % (epoch, 
             epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, 
-            epoch_mse_2/opt.epoch_size, epoch_kld_2/opt.epoch_size, 
+            epoch_mse_2/opt.epoch_size, 
             epoch*opt.epoch_size*opt.batch_size))
     #progress.finish()
     #utils.clear_progressbar()
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
     writer.add_scalar('mse_2', epoch_mse_2/opt.epoch_size, epoch)
-    writer.add_scalar('kld_2', epoch_kld_2/opt.epoch_size, epoch)
     
     # plot some stuff
     frame_predictor.eval()
@@ -418,8 +404,9 @@ for epoch in range(opt.niter):
     posterior.eval()
     prior.eval()
    
-    posterior_2.eval()
-    prior_2.eval()
+    pred_encoder.eval()
+    pred_decoder.eval()
+    latent_encoder.eval()
 
     ssim, psnr = plot_rec(x, epoch, 'train')
     print("Train ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
@@ -435,8 +422,9 @@ for epoch in range(opt.niter):
         'frame_predictor': frame_predictor,
         'posterior': posterior,
         'prior': prior,
-        'prior_2': prior_2,
-        'posterior_2': posterior_2,
+        'pred_encoder': pred_encoder,
+        'pred_decoder': pred_decoder,
+        'latent_encoder': latent_encoder,
         'opt': opt},
         '%s/model.pth' % opt.log_dir)
     if epoch % 10 == 0:

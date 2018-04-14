@@ -25,6 +25,28 @@ class dcgan_upconv(nn.Module):
     def forward(self, input):
         return self.main(input)
 
+
+class ErrorEncoder(nn.Module):
+    def __init__(self, dim, nc):
+        super(ErrorEncoder, self).__init__()
+        self.convenc = encoder(dim, nc)
+        self.lin = nn.Sequential(
+                nn.Linear(dim, 1024),
+                nn.BatchNorm1d(1024),
+                nn.ReLU(True),
+                nn.Linear(1024, 1024),
+                nn.BatchNorm1d(1024),
+                nn.ReLU(True),
+                nn.Linear(1024, dim),
+                nn.Tanh()
+                )
+                
+    def forward(self, input):
+        x = self.convenc(input)[0]
+        x = self.lin(x)
+        return x
+
+
 class encoder(nn.Module):
     def __init__(self, dim, nc=1):
         super(encoder, self).__init__()

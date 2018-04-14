@@ -121,6 +121,8 @@ else:
     prior_2.load_state_dict(posterior.state_dict())
     latent_encoder =  nn.Linear(opt.z_dim, opt.g_dim)
     latent_encoder.apply(utils.init_weights)
+    latent_encoder1 =  nn.Linear(opt.z_dim, opt.g_dim)
+    latent_encoder1.apply(utils.init_weights)
 
 if opt.model == 'highcap':
     import models.dcgan_64_high as model
@@ -151,12 +153,12 @@ if opt.load_all == 1:
     pred_decoder = saved_model['pred_decoder']
 else:
     pred_encoder = model.encoder(opt.g_dim, opt.channels)
-    pred_decoder = model.decoder(opt.g_dim+opt.z_dim, opt.channels)
+    pred_decoder = model.decoder(opt.g_dim, opt.channels)
     #pred_encoder.apply(utils.init_weights)
     #pred_decoder.apply(utils.init_weights)
     #### Preload weights #####
-    pred_encoder.load_state_dict(saved_model['pred_encoder'].state_dict())
-    pred_decoder.load_state_dict(saved_model['pred_decoder'].state_dict())
+    pred_encoder.load_state_dict(encoder.state_dict())
+    pred_decoder.load_state_dict(decoder.state_dict())
 
 
 '''
@@ -185,6 +187,7 @@ prior_2_optimizer = opt.optimizer(prior_2.parameters(), lr=opt.lr, betas=(opt.be
 pred_decoder_optimizer = opt.optimizer(pred_decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 pred_encoder_optimizer = opt.optimizer(pred_encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 latent_encoder_optimizer = opt.optimizer(latent_encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+latent_encoder1_optimizer = opt.optimizer(latent_encoder1.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
 
 # --------- loss functions ------------------------------------
@@ -212,6 +215,7 @@ prior_2.cuda()
 pred_encoder.cuda()
 pred_decoder.cuda()
 latent_encoder.cuda()
+latent_encoder1.cuda()
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
 
@@ -271,8 +275,9 @@ def plot_rec(x, epoch, _type):
             x_pred_h = pred_encoder(x_pred)[0]
             x_pred_h.detach()
             #####z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
+            #####x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
             z_t_2, mu_2, logvar_2 = posterior_2(h_target + latent_encoder(z_t))
-            x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
+            x_pred_2 = pred_decoder([x_pred_h + latent_encoder1(z_t_2), skip])
 
             gen_seq.append(x_pred_2)
             gt_seq.append(x[i].data.cpu().numpy())
@@ -303,6 +308,8 @@ def train(x):
     prior_2.zero_grad()
     pred_encoder.zero_grad()
     pred_decoder.zero_grad()
+    latent_encoder.zero_grad()
+    latent_encoder1.zero_grad()
 
     # initialize the hidden state.
     frame_predictor.hidden = frame_predictor.init_hidden()
@@ -340,11 +347,12 @@ def train(x):
 
         x_pred_h = pred_encoder(x_pred)[0]
         #####z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
+        #####x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
         z_t_2, mu_2, logvar_2 = posterior_2(h_target + latent_encoder(z_t))
-        x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
+        x_pred_2 = pred_decoder([x_pred_h + latent_encoder1(z_t_2), skip])
 
         ####_, mu_p_2, logvar_p_2 = prior_2(torch.cat([h, z_t], 1))
-        _, mu_2, logvar_2 = prior_2(h + latent_encoder(z_t))
+        _, mu_p_2, logvar_p_2 = prior_2(h + latent_encoder(z_t))
 
         mse_2 += mse_criterion(x_pred_2, x[i])
         kld_2 += kl_criterion(mu_2, logvar_2, mu_p_2, logvar_p_2)
@@ -364,6 +372,7 @@ def train(x):
     pred_decoder_optimizer.step()
     pred_encoder_optimizer.step()
     latent_encoder_optimizer.step()
+    latent_encoder1_optimizer.step()
 
 
     _losses = (
@@ -389,6 +398,7 @@ for epoch in range(opt.niter):
     pred_encoder.train()
     pred_decoder.train()
     latent_encoder.train()
+    latent_encoder1.train()
 
     epoch_mse = 0
     epoch_kld = 0
@@ -431,6 +441,7 @@ for epoch in range(opt.niter):
     posterior_2.eval()
     prior_2.eval()
     latent_encoder.eval()
+    latent_encoder1.eval()
 
     ssim, psnr = plot_rec(x, epoch, 'train')
     print("Train ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
@@ -451,6 +462,7 @@ for epoch in range(opt.niter):
         'prior_2': prior_2,
         'posterior_2': posterior_2,
         'latent_encoder': latent_encoder,
+        'latent_encoder1': latent_encoder1,
         'opt': opt},
         '%s/model.pth' % opt.log_dir)
     if epoch % 10 == 0:
