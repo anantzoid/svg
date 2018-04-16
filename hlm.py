@@ -49,6 +49,7 @@ parser.add_argument('--rec1', type=float, default=0, help='mse 1st part')
 parser.add_argument('--beta2', type=float, default=0, help='kld 2nd part')
 parser.add_argument('--load_all', type=int, default=0, help='load both models')
 parser.add_argument('--joint', type=int, default=0, help='backprop from L2 to L1')
+parser.add_argument('--new_skip', type=int, default=0, help='backprop from L2 to L1')
 
 opt = parser.parse_args()
 if opt.model_dir != '':
@@ -110,6 +111,8 @@ else:
 if opt.load_all == 1:
     posterior_2 = saved_model['posterior_2']
     prior_2 = saved_model['prior_2']
+    latent_encoder = saved_model['latent_encoder']
+    latent_encoder1 = saved_model['latent_encoder1']
 else:
     #posterior_2 = lstm_models.gaussian_lstm(opt.g_dim+opt.z_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
     #prior_2 = lstm_models.gaussian_lstm(opt.g_dim+opt.z_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
@@ -266,19 +269,29 @@ def plot_rec(x, epoch, _type):
         h = h.detach()
         h_target = h_target.detach()
         z_t, _, _= posterior(h_target)
+        h_pred = frame_predictor(torch.cat([h, z_t], 1))
+        x_pred = decoder([h_pred, skip]).detach()
+
+        x_pred_h = pred_encoder(x_pred)
+        if opt.new_skip == 1:
+            if opt.last_frame_skip or i < opt.n_past:	
+                x_pred_h, skip_2 = x_pred_h
+            else:
+                x_pred_h = x_pred_h[0]
+        else:
+            x_pred_h = x_pred_h[0]
+            skip_2 = skip
+
+        x_pred_h.detach()
+        #####z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
+        #####x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
+        z_t_2, mu_2, logvar_2 = posterior_2(h_target + latent_encoder(z_t))
+        x_pred_2 = pred_decoder([x_pred_h + latent_encoder1(z_t_2), skip_2])
+
+
         if i < opt.n_past:
             gen_seq.append(x[i])
         else:
-            h_pred = frame_predictor(torch.cat([h, z_t], 1))
-            x_pred = decoder([h_pred, skip]).detach()
-            
-            x_pred_h = pred_encoder(x_pred)[0]
-            x_pred_h.detach()
-            #####z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
-            #####x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
-            z_t_2, mu_2, logvar_2 = posterior_2(h_target + latent_encoder(z_t))
-            x_pred_2 = pred_decoder([x_pred_h + latent_encoder1(z_t_2), skip])
-
             gen_seq.append(x_pred_2)
             gt_seq.append(x[i].data.cpu().numpy())
             pred_seq.append(x_pred_2.data.cpu().numpy())
@@ -345,11 +358,21 @@ def train(x):
             h = h.detach()
             z_t = z_t.detach()
 
-        x_pred_h = pred_encoder(x_pred)[0]
+
+        x_pred_h = pred_encoder(x_pred)
+        if opt.new_skip == 1:
+            if opt.last_frame_skip or i < opt.n_past:	
+                x_pred_h, skip_2 = x_pred_h
+            else:
+                x_pred_h = x_pred_h[0]
+        else:
+            x_pred_h = x_pred_h[0]
+            skip_2 = skip
+
         #####z_t_2, mu_2, logvar_2 = posterior_2(torch.cat([h_target, z_t], 1))
         #####x_pred_2 = pred_decoder([torch.cat([x_pred_h, z_t_2], 1), skip])
         z_t_2, mu_2, logvar_2 = posterior_2(h_target + latent_encoder(z_t))
-        x_pred_2 = pred_decoder([x_pred_h + latent_encoder1(z_t_2), skip])
+        x_pred_2 = pred_decoder([x_pred_h + latent_encoder1(z_t_2), skip_2])
 
         ####_, mu_p_2, logvar_p_2 = prior_2(torch.cat([h, z_t], 1))
         _, mu_p_2, logvar_p_2 = prior_2(h + latent_encoder(z_t))

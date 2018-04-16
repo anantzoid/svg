@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=hlm7
+#SBATCH --job-name=hlm8cont
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
@@ -86,7 +86,26 @@ source activate env
 
 #4/14
 #L2 models initialized from L1
-python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002
+#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002
 
 #continuining hlm6 with lower LR (learnt Lr decay is needed in L1Loss)
 #python hlm1.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm6cont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm6 --beta2 0 --rec1 0 --beta 0 --joint 0 --l1 1 --lr 0.0001 --load_all 1
+
+#residual error, also skip conn coming from L2 enc
+#python hlm2.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm8 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002
+
+#skip connection in L2 decoder comes from L2 encoder (rather than L1 encoder)
+#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm9 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002 --new_skip 1
+
+#python hlm1.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm5 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1 --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002 --new_skip 1
+
+# residual with higher lr
+#python hlm2.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm8_l1 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.002
+
+#4/16
+#continuing l2 init from l1 with skip from l1
+#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7cont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm7  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002 --load_all 1
+
+#continuining residual with le 2e-3->gave lowest mse in all hlms
+python hlm2.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm8_l1cont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm8_l1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.002
+

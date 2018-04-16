@@ -247,25 +247,24 @@ def plot_rec(x, epoch, _type):
         h = h.detach()
         h_target = h_target.detach()
         z_t, _, _= posterior(h_target)
+
+        
+        h_pred = frame_predictor(torch.cat([h, z_t], 1))
+        x_pred = decoder([h_pred, skip]).detach()
+
+        ###Level 2
+        residual = x[i] - Variable(x_pred.data)
+        latent = latent_encoder(residual)
+        h_2 = pred_encoder(Variable(x_pred.data))
+        if opt.last_frame_skip or i < opt.n_past:	
+            h_2, skip_2 = h_2
+        else:
+            h_2 = h_2[0]
+        x_pred_2 = pred_decoder([h_2 + latent, skip_2])
+
         if i < opt.n_past:
             gen_seq.append(x[i])
         else:
-            h_pred = frame_predictor(torch.cat([h, z_t], 1))
-            x_pred = decoder([h_pred, skip]).detach()
-            
-
-            ###Level 2
-            residual = x[i] - Variable(x_pred.data)
-            latent = latent_encoder(residual)
-            h_2 = pred_encoder(Variable(x_pred.data))
-            if opt.last_frame_skip or i < opt.n_past:	
-                h_2, skip_2 = h_2
-            else:
-                h_2 = h_2[0]
-
-            x_pred_2 = pred_decoder([h_2 + latent, skip_2])
-    
-        
             gen_seq.append(x_pred_2)
             gt_seq.append(x[i].data.cpu().numpy())
             pred_seq.append(x_pred_2.data.cpu().numpy())
@@ -303,7 +302,6 @@ def train(x):
     mse = 0
     kld = 0
     mse_2 = 0
-    kld_2 = 0
     for i in range(1, opt.n_past+opt.n_future):
         h = encoder(x[i-1])
         h_target = encoder(x[i])[0]
@@ -372,7 +370,6 @@ for epoch in range(opt.niter):
     epoch_mse = 0
     epoch_kld = 0
     epoch_mse_2 = 0
-    epoch_kld_2 = 0
 
     #progress = progressbar.ProgressBar(max_value=opt.epoch_size).start()
     for i in range(opt.epoch_size):
@@ -384,7 +381,6 @@ for epoch in range(opt.niter):
         epoch_mse += mse
         epoch_kld += kld
         epoch_mse_2 += mse_2
-        epoch_kld_2 += kld_2
 
 
     print('[%02d] mse loss: %.5f | kld loss: %.5f | mse_2 loss: %.5f  (%d)' % (epoch, 
