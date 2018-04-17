@@ -43,7 +43,7 @@ parser.add_argument('--model', default='dcgan', help='model type (dcgan | vgg)')
 parser.add_argument('--data_threads', type=int, default=5, help='number of data loading threads')
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
-parser.add_argument('--mse', default=0, help='use mse else use masked mse loss')
+parser.add_argument('--mse', default=0, type=int, help='use mse else use masked mse loss')
 
 
 
@@ -67,13 +67,14 @@ else:
 
 ###################
 ###################
+'''
 opt.mse = 0
 opt.log_dir = 'logs/pretrained_masked' 
 opt.name = 'pretrained_masked'
 opt.n_eval = 12
 opt.data_root = '/beegfs/ag4508/svg/' 
 
-
+'''
 ###################
 ###################
 
@@ -105,7 +106,8 @@ else:
     raise ValueError('Unknown optimizer: %s' % opt.optimizer)
 
 
-import models.lstm as lstm_models
+#import models.lstm as lstm_models
+import models.original_lstm as lstm_models
 if opt.model_dir != '':
     frame_predictor = saved_model['frame_predictor']
     posterior = saved_model['posterior']
@@ -444,6 +446,7 @@ for epoch in range(opt.niter):
     #x = next(training_batch_generator)
     ssim, psnr = plot_rec(x, epoch, 'train')
     print("recon Train ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
+    '''
     ssim, psnr = plot(x, epoch)
     print("gen Train ssim: %.4f, psnr: %.4f"%(ssim, psnr))
     x = next(testing_batch_generator)
@@ -481,3 +484,4 @@ for epoch in range(opt.niter):
     if lr < 1e-6:
         exit()
 
+    '''

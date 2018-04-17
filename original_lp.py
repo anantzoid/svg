@@ -43,7 +43,7 @@ parser.add_argument('--model', default='dcgan', help='model type (dcgan | vgg)')
 parser.add_argument('--data_threads', type=int, default=5, help='number of data loading threads')
 parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
-parser.add_argument('--mse', default=0, help='use mse else use masked mse loss')
+parser.add_argument('--mse', default=0, type=int, help='use mse else use masked mse loss')
 
 
 
@@ -98,8 +98,8 @@ else:
     raise ValueError('Unknown optimizer: %s' % opt.optimizer)
 
 
-#import models.lstm as lstm_models
-import models.original_lstm as lstm_models
+import models.lstm as lstm_models
+#import models.original_lstm as lstm_models
 if opt.model_dir != '':
     frame_predictor = saved_model['frame_predictor']
     posterior = saved_model['posterior']
@@ -410,10 +410,12 @@ for epoch in range(opt.niter):
    
     ssim, psnr = plot_rec(x, epoch, 'train')
     print("Train ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
+    '''
     x = next(testing_batch_generator)
     #plot(x, epoch)
     ssim, psnr = plot_rec(x, epoch, 'test')
     print("Test ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
+    '''
 
     # save the model
     torch.save({
