@@ -11,7 +11,7 @@
 
 module purge
 #module load tensorflow/python3.6/1.5.0
-source activate env1
+source activate env
 
 #python train_svg_lp.py --dataset smmnist --num_digits 2 --g_dim 128 --z_dim 10 --beta 0.0001 --data_root data/mnist --log_dir logs --name mnist_lp_original
 #python generate_svg_lp.py --model_path pretrain_models/svglp_bair.pth --log_dir pretrained_lp --data_root /scratch/ag4508/svg --dataset bair --z_dim 10 --g_dim 128
@@ -68,4 +68,4 @@ source activate env1
 
 
 #4/16
-python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0 --channels 3 --dataset epic --mse 1 --epoch_size 10 --batch_size 64 --name epic0 --data_threads 10 --log_dir logs
+python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0 --channels 3 --dataset epic --mse 1  --batch_size 64 --name epic0 --data_threads 10 --log_dir logs

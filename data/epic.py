@@ -25,7 +25,7 @@ class EpicKitchen(object):
         if not self.seed_is_set:
             self.seed_is_set = True
             np.random.seed(seed)
- 
+
     def get_seq(self):
         if self.ordered:
             if self.d + self.seq_len >= self.num_img:
@@ -33,15 +33,20 @@ class EpicKitchen(object):
             else:
                 self.d += 1
         else:
-            self.d = np.random.randint(self.num_img-self.seq_len)
+            self.d = np.random.randint(1, self.num_img-self.seq_len)
         image_seq = []
-        for i in range(self.seq_len):
-            i_str = str(self.d + i)
-            fname = '%s/frame_%s%s.jpg' % (self.path, '0'*(10-len(i_str)) ,i_str)
-            im = imread(fname)
-            im = imresize(im[:, 100:356, :], (64, 64, 3))
-            im = im.reshape(1, 64, 64, 3)
-            image_seq.append(im/255.)
+        try:
+            for i in range(self.seq_len):
+                i_str = str(self.d + i)
+                fname = '%s/frame_%s%s.jpg' % (self.path, '0'*(10-len(i_str)) ,i_str)
+                im = imread(fname)
+                im = imresize(im[:, 100:356, :], (64, 64, 3))
+                im = im.reshape(1, 64, 64, 3)
+                image_seq.append(im/255.)
+        except:
+            # to account for any missing indices while retreiveing data
+            return self.get_seq()
+
         image_seq = np.concatenate(image_seq, axis=0)
         return image_seq
 
