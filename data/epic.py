@@ -8,7 +8,7 @@ from scipy.misc import imread
 
 
 class EpicKitchen(object):
-    def __init__(self, data_root, train=True, seq_len=20, image_size=64):
+    def __init__(self, data_root, train=True, seq_len=20, image_size=64, skip=1):
         self.path = '/beegfs/ag4508/EPIC_KITCHENS_2018/frames_rgb_flow/rgb/test/P01/P01_13'
         if train:
             self.ordered = False
@@ -16,7 +16,8 @@ class EpicKitchen(object):
             self.ordered = True 
  
         self.image_size = image_size
-        self.seq_len = seq_len
+        self.skip = skip
+        self.seq_len = seq_len * self.skip
         self.num_img = len(os.listdir(self.path))
         self.d = 0
         self.seed_is_set = False # multi threaded loading
@@ -47,6 +48,7 @@ class EpicKitchen(object):
             # to account for any missing indices while retreiveing data
             return self.get_seq()
 
+        image_seq = image_seq[::self.skip]
         image_seq = np.concatenate(image_seq, axis=0)
         return image_seq
 

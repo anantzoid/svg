@@ -59,12 +59,14 @@ def load_dataset(opt):
                 data_root=opt.data_root,
                 train=True,
                 seq_len=opt.max_step,
-                image_size=opt.image_width)
+                image_size=opt.image_width,
+                skip=opt.skip_frames+1)
         test_data = EpicKitchen(
                 data_root=opt.data_root,
                 train=False,
                 seq_len=opt.n_eval,
-                image_size=opt.image_width)
+                image_size=opt.image_width,
+                skip=opt.skip_frames+1)
     return train_data, test_data
 
 def sequence_input(seq, dtype):

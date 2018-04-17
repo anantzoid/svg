@@ -45,6 +45,8 @@ parser.add_argument('--num_digits', type=int, default=2, help='number of digits 
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 parser.add_argument('--mse', default=0, type=int, help='use mse else use masked mse loss')
 
+parser.add_argument('--skip_frames', default=0, type=int, help='# of frames to skip in between when using epic dataset')
+
 
 
 opt = parser.parse_args()
@@ -452,6 +454,7 @@ for epoch in range(opt.niter):
     print("recon Test ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
     ssim, psnr = plot(x, epoch)
     print("gen Test ssim: %.4f, psnr: %.4f"%(ssim, psnr))
+    '''
 
     # save the model
     torch.save({
@@ -466,6 +469,7 @@ for epoch in range(opt.niter):
         print('log dir: %s' % opt.log_dir)
 
 
+    '''
     lr = opt.lr * (0.1 ** (epoch // 30))
     print("LR changed to: ", lr)
     for param_group in frame_predictor_optimizer.param_groups:

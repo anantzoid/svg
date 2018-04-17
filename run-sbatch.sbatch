@@ -2,7 +2,7 @@
 
 #SBATCH --verbose
 #SBATCH --job-name=epic
-#SBATCH --time=10:00:00
+#SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --gres=gpu:1 -c1
@@ -68,4 +68,6 @@ source activate env
 
 
 #4/16
-python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0 --channels 3 --dataset epic --mse 1  --batch_size 64 --name epic0 --data_threads 10 --log_dir logs
+#python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0 --channels 3 --dataset epic --mse 1  --batch_size 64 --name epic0 --data_threads 10 --log_dir logs
+
+python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 100 --name epic1 --data_threads 10 --log_dir logs --skip_frames 3
