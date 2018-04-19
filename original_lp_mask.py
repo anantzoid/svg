@@ -55,16 +55,16 @@ if opt.model_dir != '':
     saved_model = torch.load('%s/model.pth' % opt.model_dir)
     optimizer = opt.optimizer
     model_dir = opt.model_dir
-    opt = saved_model['opt']
+    #opt = saved_model['opt']
     opt.optimizer = optimizer
     opt.model_dir = model_dir
     opt.log_dir = '%s/continued' % opt.log_dir
+
+name = 'model=%s%dx%d-rnn_size=%d-rnn_layers=%d-n_past=%d-n_future=%d-lr=%.4f-g_dim=%d-z_dim=%d-last_frame_skip=%s-beta=%.7f%s' % (opt.model, opt.image_width, opt.image_width, opt.rnn_size, opt.rnn_layers, opt.n_past, opt.n_future, opt.lr, opt.g_dim, opt.z_dim, opt.last_frame_skip, opt.beta, opt.name)
+if opt.dataset == 'smmnist':
+    opt.log_dir = '%s/%s-%d/%s' % (opt.log_dir, opt.dataset, opt.num_digits, name)
 else:
-    name = 'model=%s%dx%d-rnn_size=%d-rnn_layers=%d-n_past=%d-n_future=%d-lr=%.4f-g_dim=%d-z_dim=%d-last_frame_skip=%s-beta=%.7f%s' % (opt.model, opt.image_width, opt.image_width, opt.rnn_size, opt.rnn_layers, opt.n_past, opt.n_future, opt.lr, opt.g_dim, opt.z_dim, opt.last_frame_skip, opt.beta, opt.name)
-    if opt.dataset == 'smmnist':
-        opt.log_dir = '%s/%s-%d/%s' % (opt.log_dir, opt.dataset, opt.num_digits, name)
-    else:
-        opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
+    opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
 
 
 ###################

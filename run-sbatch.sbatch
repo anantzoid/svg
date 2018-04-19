@@ -70,4 +70,5 @@ source activate env
 #4/16
 #python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0 --channels 3 --dataset epic --mse 1  --batch_size 64 --name epic0 --data_threads 10 --log_dir logs
 
-python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 100 --name epic1 --data_threads 10 --log_dir logs --skip_frames 3
+#python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 100 --name epic1 --data_threads 10 --log_dir logs --skip_frames 3
+python original_lp_mask.py --g_dim 128 --z_dim 64 --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 100 --name epic2 --data_threads 10 --log_dir logs --skip_frames 3 --model_dir logs/epic/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000epic1 
