@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=hlm8cont
+#SBATCH --job-name=hlm7c1
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
@@ -107,5 +107,28 @@ source activate env
 #python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7cont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm7  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002 --load_all 1
 
 #continuining residual with le 2e-3->gave lowest mse in all hlms
-python hlm2.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm8_l1cont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm8_l1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.002
+#python hlm2.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm8_l1cont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm8_l1  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.002
 
+#continued hlm7cont from some epoch & enable other loss objectives too
+#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7contcont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm7cont  --beta2 0.0001 --rec1 1 --beta 0.0001 --joint 0 --lr 0.0002 --load_all 1
+
+#continue hlm8_l1 as loss keeps decreasing
+#hlm8_l1cont trained again from scratch it seems
+#python hlm2.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm8_l1contcont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm8_l1 --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.002 --load_all 1
+
+
+#continue hlm7_l1 as loss keeps decreasing
+#stopped: wrong name
+####python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7contcont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000hlm7cont  --beta2 0 --rec1 0 --beta 0 --joint 0 --lr 0.0002 --load_all 1
+
+##python generate_svg_lphlm.py --model_path logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000hlm7contcont/model.pth --log_dir logs2/hlm7contcont --nsample 20 --N 20 --n_future 15 --data_root /beegfs/ag4508/svg/ --dataset bair
+
+
+#continue hlm7contcont with higher lr
+#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7contcont1 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000hlm7contcont  --beta2 0.0001 --rec1 1 --beta 0.0001 --joint 0 --lr 0.0002 --load_all 1
+
+#above with joint enabled
+#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7contcont2 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000hlm7contcont  --beta2 0.0001 --rec1 1 --beta 0.0001 --joint 1 --lr 0.0002 --load_all 1
+
+#above with lower lr. above one decreases loss further, so testing if loweing lr will take it further
+python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7contcont3 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000hlm7contcont  --beta2 0.0001 --rec1 1 --beta 0.0001 --joint 1 --lr 0.00005 --load_all 1
