@@ -256,6 +256,7 @@ def plot_rec(x, epoch, _type):
     posterior_2.hidden = posterior_2.init_hidden()
 
     gen_seq, gt_seq, pred_seq = [], [], []
+    gen_seq0 = [x[0]]
     gen_seq.append(x[0])
     x_in = x[0]
     for i in range(1, opt.n_past+opt.n_future):
@@ -291,15 +292,23 @@ def plot_rec(x, epoch, _type):
 
         if i < opt.n_past:
             gen_seq.append(x[i])
+            gen_seq0.append(x[i])
         else:
+            gen_seq0.append(x_pred)
             gen_seq.append(x_pred_2)
+
             gt_seq.append(x[i].data.cpu().numpy())
             pred_seq.append(x_pred_2.data.cpu().numpy())
     _, ssim, psnr = utils.eval_seq(gt_seq, pred_seq)
-   
+  
+
     to_plot = []
     nrow = min(opt.batch_size, 10)
     for i in range(nrow):
+        row = []
+        for t in range(opt.n_past+opt.n_future):
+            row.append(gen_seq0[t][i])
+        to_plot.append(row)
         row = []
         for t in range(opt.n_past+opt.n_future):
             row.append(gen_seq[t][i]) 
@@ -466,13 +475,14 @@ for epoch in range(opt.niter):
     latent_encoder.eval()
     latent_encoder1.eval()
 
+    x = next(training_batch_generator)
     ssim, psnr = plot_rec(x, epoch, 'train')
     print("Train ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
-    x = next(testing_batch_generator)
+    #x = next(testing_batch_generator)
     #plot(x, epoch)
-    ssim, psnr = plot_rec(x, epoch, 'test')
-    print("Test ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
-
+    #ssim, psnr = plot_rec(x, epoch, 'test')
+    #print("Test ssim: %.4f, psnr: %.4f at t=%d"%(ssim[-1], psnr[-1], ssim.shape[0]))
+    
     # save the model
     torch.save({
         'encoder': encoder,
