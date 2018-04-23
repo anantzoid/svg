@@ -4,8 +4,8 @@
 #SBATCH --job-name=hlmnew3
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=100GB
-#SBATCH --gres=gpu:2 -c2
+#SBATCH --mem=250GB
+#SBATCH --gres=gpu:4 -c4
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
@@ -133,11 +133,10 @@ source activate env
 #above with lower lr. above one decreases loss further, so testing if loweing lr will take it further
 #python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name hlm7contcont3 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000hlm7contcont  --beta2 0.0001 --rec1 1 --beta 0.0001 --joint 1 --lr 0.00005 --load_all 1
 
+#4/22
+#python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm3 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 400 
+#Added skip connection from L1 enc to L2 decoder
+python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm4 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 400 
 
-#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm1 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 
-#dataparallel
-####this fails
-#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm2 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 200 
-#python hlm.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm3 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 100 
-#load .module after this
-#compare generated images code
+
+
