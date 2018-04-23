@@ -14,7 +14,7 @@ import utils
 import itertools
 import progressbar
 import numpy as np
-from tensorboardX import SummaryWriter
+#from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--lr', default=0.002, type=float, help='learning rate')
@@ -67,19 +67,6 @@ else:
     opt.log_dir = '%s/%s/%s' % (opt.log_dir, opt.dataset, name)
 
 
-###################
-###################
-'''
-opt.mse = 0
-opt.log_dir = 'logs/pretrained_masked' 
-opt.name = 'pretrained_masked'
-opt.n_eval = 12
-opt.data_root = '/beegfs/ag4508/svg/' 
-
-'''
-###################
-###################
-
 
 os.makedirs('%s/gen/' % opt.log_dir, exist_ok=True)
 os.makedirs('%s/plots/' % opt.log_dir, exist_ok=True)
@@ -89,8 +76,9 @@ print("Random Seed: ", opt.seed)
 random.seed(opt.seed)
 torch.manual_seed(opt.seed)
 torch.cuda.manual_seed_all(opt.seed)
+torch.cuda.set_device(0)
 dtype = torch.cuda.FloatTensor
-writer = SummaryWriter(log_dir=os.path.join('plots', opt.name))
+#writer = SummaryWriter(log_dir=os.path.join('plots', opt.name))
 
 
 # ---------------- load the models  ----------------
@@ -143,19 +131,6 @@ else:
     decoder = model.decoder(opt.g_dim, opt.channels)
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
-'''
-print("======Encoder==========")
-print(encoder)
-print("======Predictor==========")
-print(frame_predictor)
-print("======Decoder==========")
-print(decoder)
-print("======Posterior==========")
-print(posterior)
-print("======Prior==========")
-print(prior)
-exit()
-'''
 
 frame_predictor_optimizer = opt.optimizer(frame_predictor.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 posterior_optimizer = opt.optimizer(posterior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
@@ -418,7 +393,6 @@ for epoch in range(opt.niter):
     for i in range(opt.epoch_size):
         #progress.update(i+1)
         x = next(training_batch_generator)
-
         # train frame_predictor 
         mse, kld, _mse = train(x)
         epoch_mse += mse
@@ -431,9 +405,11 @@ for epoch in range(opt.niter):
 
     #print('[%02d] mse loss: %.5f | kld loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
     print('[%02d] mse loss: %.5f | kld loss: %.5f | true_mse loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch__mse/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
+    '''
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
     writer.add_scalar('true_mse', epoch__mse/opt.epoch_size, epoch)
+    '''
 
     # plot some stuff
     frame_predictor.eval()
@@ -446,15 +422,13 @@ for epoch in range(opt.niter):
     #x = next(training_batch_generator)
     ssim, psnr = plot_rec(x, epoch, 'train')
     print("recon Train ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
-    '''
-    ssim, psnr = plot(x, epoch)
-    print("gen Train ssim: %.4f, psnr: %.4f"%(ssim, psnr))
+    #ssim, psnr = plot(x, epoch)
+    #print("gen Train ssim: %.4f, psnr: %.4f"%(ssim, psnr))
     x = next(testing_batch_generator)
     ssim, psnr = plot_rec(x, epoch, 'test')
     print("recon Test ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
-    ssim, psnr = plot(x, epoch)
-    print("gen Test ssim: %.4f, psnr: %.4f"%(ssim, psnr))
-    '''
+    #ssim, psnr = plot(x, epoch)
+    #print("gen Test ssim: %.4f, psnr: %.4f"%(ssim, psnr))
 
     # save the model
     torch.save({

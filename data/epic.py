@@ -27,8 +27,7 @@ class EpicKitchen(object):
                 self.dirs.append(_f)
                 #self.num_img.append(os.listdir(_f))
 
-        self.num_img = len(os.listdir(self.path))
-        self.d, self.img_counter = 0, 0
+        self.d, self.img_counter = -1, 0
         self.seed_is_set = False # multi threaded loading
         self.frame_limit = frame_limit
         ##NOTE replace self.frame_limit by self.num_img[self.d] if using all frames
@@ -40,10 +39,9 @@ class EpicKitchen(object):
 
     def get_seq(self):
         if self.ordered:
+            self.d += 1
             if self.d >= len(self.dirs):
-                self.d = 1
-            else:
-                self.d += 1
+                self.d = 0
             #random determinsitc choice:
             self.img_counter = self.frame_limit//2
         else:
@@ -55,10 +53,11 @@ class EpicKitchen(object):
                 i_str = str(self.img_counter + i)
                 fname = '%s/frame_%s%s.jpg' % (self.dirs[self.d], '0'*(10-len(i_str)) ,i_str)
                 im = imread(fname)
+                print(fname)
                 im = im.reshape(1, 128, 128, 3)
                 image_seq.append(im/255.)
         except:
-            # to account for any missing indices while retreiveing data
+        #    # to account for any missing indices while retreiveing data
             return self.get_seq()
 
         image_seq = image_seq[::self.skip]
