@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=hlmnew3
+#SBATCH --job-name=hlmnew5
 #SBATCH --time=30:00:00
 #SBATCH --nodes=1
-#SBATCH --mem=250GB
-#SBATCH --gres=gpu:4 -c4
+#SBATCH --mem=100GB
+#SBATCH --gres=gpu:2 -c2
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
@@ -136,7 +136,10 @@ source activate env
 #4/22
 #python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm3 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 400 
 #Added skip connection from L1 enc to L2 decoder
-python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm4 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 400 
+#python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm4 --model_dir /scratch/ag4508/svg/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairold1  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 400 
+
+#on pretrained model
+python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm5 --model_dir pretrain_models  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 200 
 
 
 

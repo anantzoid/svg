@@ -293,7 +293,7 @@ def plot_rec(x, epoch, _type):
     all_hidden0, all_hidden1, all_hidden2, _ = init_hidden()
     
     gen_seq, gt_seq, pred_seq = [], [], []
-    gen_seq0 = [x[0]]
+    gen_seq0, gt_seq0 = [x[0]], [x[0]]
     gen_seq.append(x[0])
     x_in = x[0]
     for i in range(1, opt.n_past+opt.n_future):
@@ -319,8 +319,10 @@ def plot_rec(x, epoch, _type):
         if i < opt.n_past:
             gen_seq.append(x[i])
             gen_seq0.append(x[i])
+            gt_seq0.append(x[i])
         else:
             gen_seq0.append(x_pred)
+            gt_seq0.append(x[i])
             gen_seq.append(x_pred_2)
             gt_seq.append(x[i].data.cpu().numpy())
             pred_seq.append(x_pred_2.data.cpu().numpy())
@@ -329,6 +331,11 @@ def plot_rec(x, epoch, _type):
     to_plot = []
     nrow = min(opt.batch_size, 10)
     for i in range(nrow):
+        row = []
+        for t in range(opt.n_past+opt.n_future):
+            row.append(gt_seq0[t][i])
+        to_plot.append(row)
+
         row = []
         for t in range(opt.n_past+opt.n_future):
             row.append(gen_seq0[t][i])
