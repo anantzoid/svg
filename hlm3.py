@@ -212,8 +212,8 @@ else:
     #pred_decoder.apply(utils.init_weights)
 
     #### Preload weights #####
-    #pred_encoder.load_state_dict(encoder.state_dict())
-    #pred_decoder.load_state_dict(decoder.state_dict())
+    model.pred_encoder.load_state_dict(model.encoder.state_dict())
+    model.pred_decoder.load_state_dict(model.decoder.state_dict())
 
 #####print(model)
 
