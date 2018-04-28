@@ -1,11 +1,11 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=hlm5contlr
-#SBATCH --time=30:00:00
+#SBATCH --job-name=gen0
+#SBATCH --time=10:00:00
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
-#SBATCH --gres=gpu:2 -c2
+#SBATCH --gres=gpu:1 -c1
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
@@ -149,7 +149,10 @@ source activate env
 #python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm6cont --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000newhlm6  --beta 0.0001 --rec1 1 --beta2 0.0001 --joint 1 --batch_size 400 --load_all 1
 
 
-#python generate_svg_lphlm.py --model_path logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000newhlm5/model.pth --log_dir logs2/newhlm5  --n_future 15 --data_root /beegfs/ag4508/svg/ --dataset bair --num_threads 10
 
 #python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm5contlr --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000newhlm5  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 200 --load_all 1 --lr 0.0002
-python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm5contlr2 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000newhlm5contlr  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 200 --load_all 1 --lr 0.0002
+#python hlm3.py --dataset bair --g_dim 128 --z_dim 64 --n_past 2 --n_future 10 --channels 3 --data_root /beegfs/ag4508/svg/ --log_dir logs  --data_threads 10 --name newhlm5contlr2 --model_dir logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000newhlm5contlr  --beta 0 --rec1 0 --beta2 0.0001 --joint 0 --batch_size 200 --load_all 1 --lr 0.0002
+
+
+#python generate_svg_lphlm.py --model_path logs/bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0002-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0000000newhlm5contlr2/model.pth --log_dir logs2/newhlm5contlr  --n_future 15 --data_root /beegfs/ag4508/svg/ --dataset bair --num_threads 10
+python generate_svg_lp.py --model_path pretrain_models/model.pth --log_dir logs2/pretrained  --n_future 15 --data_root /beegfs/ag4508/svg/ --dataset bair --num_threads 10
