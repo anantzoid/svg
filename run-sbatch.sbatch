@@ -77,3 +77,8 @@ source activate env
 
 #continued midway from 46 since it seemed to overfit, increased epoch_size 
 python parallel_original_lp_mask.py --g_dim 256 --z_dim 128  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 16 --name newepic1 --data_threads 10 --log_dir logs --skip_frames 3 --epoch_size 600 --image_width 128 --model vgg --data_root /beegfs/ag4508/ --model_dir logs/epic/model=vgg128x128-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0001000newepic 
+
+
+
+
+

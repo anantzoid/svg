@@ -96,13 +96,18 @@ else:
 
 import models.lstm_parallel as lstm_models
 #import models.original_lstm as lstm_models
+
+frame_predictor = lstm_models.lstm(opt.g_dim+opt.z_dim, opt.g_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
+posterior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
 if opt.model_dir != '':
-    frame_predictor = saved_model['frame_predictor']
-    posterior = saved_model['posterior']
+    try:
+        frame_predictor.load_state_dict(saved_model['frame_predictor'].state_dict())
+        posterior.load_state_dict(saved_model['posterior'].state_dict())
+    except:
+        frame_predictor.load_state_dict(saved_model['frame_predictor'].module.state_dict())
+        posterior.load_state_dict(saved_model['posterior'].module.state_dict())
     #prior = saved_model['prior']
 else:
-    frame_predictor = lstm_models.lstm(opt.g_dim+opt.z_dim, opt.g_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
-    posterior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
     #prior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
     frame_predictor.apply(utils.init_weights)
     posterior.apply(utils.init_weights)
@@ -121,12 +126,16 @@ elif opt.model == 'vgg':
 else:
     raise ValueError('Unknown model: %s' % opt.model)
        
+encoder = model.encoder(opt.g_dim, opt.channels)
+decoder = model.decoder(opt.g_dim, opt.channels)
 if opt.model_dir != '':
-    decoder = saved_model['decoder']
-    encoder = saved_model['encoder']
+    try:
+        encoder.load_state_dict(saved_model['encoder'].state_dict())
+        decoder.load_state_dict(saved_model['decoder'].state_dict())
+    except:
+        encoder.load_state_dict(saved_model['encoder'].module.state_dict())
+        decoder.load_state_dict(saved_model['decoder'].module.state_dict())
 else:
-    encoder = model.encoder(opt.g_dim, opt.channels)
-    decoder = model.decoder(opt.g_dim, opt.channels)
     encoder.apply(utils.init_weights)
     decoder.apply(utils.init_weights)
 
@@ -348,10 +357,10 @@ for epoch in range(opt.niter):
 
     # save the model
     torch.save({
-        'encoder': encoder,
-        'decoder': decoder,
-        'frame_predictor': frame_predictor,
-        'posterior': posterior,
+        'encoder': encoder.module,
+        'decoder': decoder.module,
+        'frame_predictor': frame_predictor.module,
+        'posterior': posterior.module,
         'opt': opt},
         '%s/model.pth' % opt.log_dir)
     if epoch % 10 == 0:
