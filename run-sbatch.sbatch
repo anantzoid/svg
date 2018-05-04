@@ -77,13 +77,17 @@ source activate pyt3
 #python parallel_original_lp_mask.py --g_dim 256 --z_dim 128  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 16 --name newepic --data_threads 10 --log_dir logs --skip_frames 3 --epoch_size 300 --image_width 128 --model vgg --data_root /beegfs/ag4508/ 
 
 #continued midway from 46 since it seemed to overfit, increased epoch_size 
-#python parallel_original_lp_mask.py --g_dim 256 --z_dim 128  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 8 --name newepic1 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 128 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/ --model_dir /misc/vlgscratch4/FergusGroup/anant/
+# This ran on cims
+###python parallel_original_lp_mask.py --g_dim 256 --z_dim 128  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 16 --name newepic1 --data_threads 10 --log_dir logs --skip_frames 3 --epoch_size 600 --image_width 128 --model vgg --data_root /beegfs/ag4508/ --model_dir logs/epic/model=vgg128x128-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0001000newepic 
 
 # 64x64 version. Note the change in data_root location
 #python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 32 --name newepic2 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ 
 
 #continuing above on dgx
-python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 64 --name newepic3 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ --model_dir /misc/vlgscratch4/FergusGroup/anant/svg//epic/model=vgg64x64-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000newepic2 
+#python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 64 --name newepic3 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ --model_dir /misc/vlgscratch4/FergusGroup/anant/svg//epic/model=vgg64x64-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000newepic2 
+
+#dgx, dcgan version. vgg overfits
+python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 100 --name newepic4 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ --gpuid 1 --gpu_range 1_5 
 
 
 ## test cmd

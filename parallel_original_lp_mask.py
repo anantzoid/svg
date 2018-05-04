@@ -45,7 +45,7 @@ parser.add_argument('--mse', default=0, type=int, help='use mse else use masked 
 parser.add_argument('--skip_frames', default=0, type=int, help='# of frames to skip in between when using epic dataset')
 
 parser.add_argument('--gpuid', default=0, type=int, help='set_device')
-parser.add_argument('--gpu_range', default='', type=str, help='eg. 1,5')
+parser.add_argument('--gpu_range', default='', type=str, help='eg. 1_5')
 
 opt = parser.parse_args()
 if opt.model_dir != '':
@@ -172,7 +172,7 @@ if opt.gpu_range == '':
     frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(torch.cuda.device_count()))
     posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
 else:
-    _g = opt.gpu_range.split(',')
+    _g = opt.gpu_range.split('_')
     g_st, g_end = int(_g[0]), int(_g[1])
     encoder = torch.nn.DataParallel(encoder, device_ids=range(g_st, g_end))
     decoder = torch.nn.DataParallel(decoder, device_ids=range(g_st, g_end))
