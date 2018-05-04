@@ -44,7 +44,8 @@ parser.add_argument('--mse', default=0, type=int, help='use mse else use masked 
 
 parser.add_argument('--skip_frames', default=0, type=int, help='# of frames to skip in between when using epic dataset')
 
-
+parser.add_argument('--gpuid', default=0, type=int, help='set_device')
+parser.add_argument('--gpu_range', default='', type=str, help='eg. 1,5')
 
 opt = parser.parse_args()
 if opt.model_dir != '':
@@ -73,7 +74,7 @@ print("Random Seed: ", opt.seed)
 random.seed(opt.seed)
 torch.manual_seed(opt.seed)
 torch.cuda.manual_seed_all(opt.seed)
-torch.cuda.set_device(0)
+torch.cuda.set_device(opt.gpuid)
 dtype = torch.cuda.FloatTensor
 writer = SummaryWriter(log_dir=os.path.join('plots', opt.name))
 
@@ -165,14 +166,21 @@ encoder.cuda()
 decoder.cuda()
 mse_criterion.cuda()
 
-encoder = torch.nn.DataParallel(encoder, device_ids=range(torch.cuda.device_count()))
-decoder = torch.nn.DataParallel(decoder, device_ids=range(torch.cuda.device_count()))
-frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(torch.cuda.device_count()))
-posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
+if opt.gpu_range == '':
+    encoder = torch.nn.DataParallel(encoder, device_ids=range(torch.cuda.device_count()))
+    decoder = torch.nn.DataParallel(decoder, device_ids=range(torch.cuda.device_count()))
+    frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(torch.cuda.device_count()))
+    posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
+else:
+    _g = opt.gpu_range.split(',')
+    g_st, g_end = int(_g[0]), int(_g[1])
+    encoder = torch.nn.DataParallel(encoder, device_ids=range(g_st, g_end))
+    decoder = torch.nn.DataParallel(decoder, device_ids=range(g_st, g_end))
+    frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(g_st, g_end))
+    posterior = torch.nn.DataParallel(posterior, device_ids=range(g_st, g_end))
+
+
 #prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
-
-
-
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
 
@@ -304,7 +312,7 @@ def train(x):
     encoder_optimizer.step()
     decoder_optimizer.step()
 
-    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past), _m
+    return mse.data.cpu().numpy()/(opt.n_past+opt.n_future), kld.data.cpu().numpy()/(opt.n_future+opt.n_past), 0
 # --------- training loop ------------------------------------
 for epoch in range(opt.niter):
     frame_predictor.train()
@@ -349,9 +357,9 @@ for epoch in range(opt.niter):
     print("recon Train ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
     #ssim, psnr = plot(x, epoch)
     #print("gen Train ssim: %.4f, psnr: %.4f"%(ssim, psnr))
-    #x = next(testing_batch_generator)
-    #ssim, psnr = plot_rec(x, epoch, 'test')
-    #print("recon Test ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
+    x = next(testing_batch_generator)
+    ssim, psnr = plot_rec(x, epoch, 'test')
+    print("recon Test ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
     #ssim, psnr = plot(x, epoch)
     #print("gen Test ssim: %.4f, psnr: %.4f"%(ssim, psnr))
 

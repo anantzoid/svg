@@ -1,17 +1,18 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=epic1
-#SBATCH --time=30:00:00
+#SBATCH --job-name=epic64
 #SBATCH --nodes=1
-#SBATCH --mem=250GB
-#SBATCH --gres=gpu:4 -c4
+#SBATCH --mem=100GB
+#SBATCH --gres=gpu:2 -c2
+#SBATCH --constraint="gpu_12gb&pascal"
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
 
-module purge
+######SBATCH --time=30:00:00
+#module purge
 #module load tensorflow/python3.6/1.5.0
-source activate env
+source activate pyt3
 
 #python train_svg_lp.py --dataset smmnist --num_digits 2 --g_dim 128 --z_dim 10 --beta 0.0001 --data_root data/mnist --log_dir logs --name mnist_lp_original
 #python generate_svg_lp.py --model_path pretrain_models/svglp_bair.pth --log_dir pretrained_lp --data_root /scratch/ag4508/svg --dataset bair --z_dim 10 --g_dim 128
@@ -76,9 +77,15 @@ source activate env
 #python parallel_original_lp_mask.py --g_dim 256 --z_dim 128  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 16 --name newepic --data_threads 10 --log_dir logs --skip_frames 3 --epoch_size 300 --image_width 128 --model vgg --data_root /beegfs/ag4508/ 
 
 #continued midway from 46 since it seemed to overfit, increased epoch_size 
-python parallel_original_lp_mask.py --g_dim 256 --z_dim 128  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 16 --name newepic1 --data_threads 10 --log_dir logs --skip_frames 3 --epoch_size 600 --image_width 128 --model vgg --data_root /beegfs/ag4508/ --model_dir logs/epic/model=vgg128x128-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=256-z_dim=128-last_frame_skip=False-beta=0.0001000newepic 
+#python parallel_original_lp_mask.py --g_dim 256 --z_dim 128  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 8 --name newepic1 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 128 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/ --model_dir /misc/vlgscratch4/FergusGroup/anant/
+
+# 64x64 version. Note the change in data_root location
+#python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 32 --name newepic2 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ 
+
+#continuing above on dgx
+python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 64 --name newepic3 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ --model_dir /misc/vlgscratch4/FergusGroup/anant/svg//epic/model=vgg64x64-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000newepic2 
 
 
-
-
+## test cmd
+####python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 32 --name temp --data_threads 1 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 10 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/
 

@@ -16,7 +16,7 @@ class EpicKitchen(object):
         else:
             self.data_dir = '%s/test_processed' % self.root_dir 
             self.ordered = True 
- 
+
         self.image_size = image_size
         self.skip = skip
         self.seq_len = seq_len * self.skip
@@ -43,7 +43,9 @@ class EpicKitchen(object):
             if self.d >= len(self.dirs):
                 self.d = 0
             #random determinsitc choice:
-            self.img_counter = self.frame_limit//2
+            #not useful when only 1 folder is there
+            #self.img_counter = self.frame_limit//2
+            self.img_counter = np.random.randint(1, self.frame_limit - self.seq_len)
         else:
             self.d = np.random.randint(0, len(self.dirs))
             self.img_counter = np.random.randint(1, self.frame_limit - self.seq_len)
@@ -54,7 +56,7 @@ class EpicKitchen(object):
             fname = '%s/frame_%s%s.jpg' % (self.dirs[self.d], '0'*(10-len(i_str)) ,i_str)
             im = imread(fname)
             #print(fname)
-            im = im.reshape(1, 128, 128, 3)
+            im = im.reshape(1, self.image_size, self.image_size, 3)
             image_seq.append(im/255.)
         #except:
         #    # to account for any missing indices while retreiveing data
