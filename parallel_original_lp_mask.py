@@ -46,6 +46,7 @@ parser.add_argument('--skip_frames', default=0, type=int, help='# of frames to s
 
 parser.add_argument('--gpuid', default=0, type=int, help='set_device')
 parser.add_argument('--gpu_range', default='', type=str, help='eg. 1_5')
+parser.add_argument('--filterdata', default='', type=str, help='file to load list of dirs from (for bair)')
 
 opt = parser.parse_args()
 if opt.model_dir != '':

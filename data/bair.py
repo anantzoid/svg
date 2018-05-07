@@ -11,7 +11,7 @@ class RobotPush(object):
     
     """Data Handler that loads robot pushing data."""
 
-    def __init__(self, data_root, train=True, seq_len=20, image_size=64):
+    def __init__(self, data_root, train=True, seq_len=20, image_size=64, filterdata=''):
         self.root_dir = data_root 
         if train:
             self.data_dir = '%s/processed_data/train' % self.root_dir
@@ -20,9 +20,15 @@ class RobotPush(object):
             self.data_dir = '%s/processed_data/test' % self.root_dir
             self.ordered = True 
         self.dirs = []
-        for d1 in os.listdir(self.data_dir):
-            for d2 in os.listdir('%s/%s' % (self.data_dir, d1)):
-                self.dirs.append('%s/%s/%s' % (self.data_dir, d1, d2))
+        if filterdata == '':
+            for d1 in os.listdir(self.data_dir):
+                for d2 in os.listdir('%s/%s' % (self.data_dir, d1)):
+                    self.dirs.append('%s/%s/%s' % (self.data_dir, d1, d2))
+        else:
+            with open(filterdata, 'r') as f:
+                for line in f.readlines():
+                    self.dirs.append(line.rstrip('\n'))
+            
         self.seq_len = seq_len
         self.image_size = image_size 
         self.seed_is_set = False # multi threaded loading

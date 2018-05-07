@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=epic64
+#SBATCH --job-name=bair2
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
-#SBATCH --gres=gpu:2 -c2
+#SBATCH --gres=gpu:4 -c4
 #SBATCH --constraint="gpu_12gb&pascal"
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ag4508@nyu.edu
@@ -87,7 +87,24 @@ source activate pyt3
 #python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 64 --name newepic3 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ --model_dir /misc/vlgscratch4/FergusGroup/anant/svg//epic/model=vgg64x64-rnn_size=256-rnn_layers=2-n_past=5-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000newepic2 
 
 #dgx, dcgan version. vgg overfits
-python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 100 --name newepic4 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ --gpuid 1 --gpu_range 1_5 
+#python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 600 --name newepic4 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ --gpuid 1 --gpu_range 1_5 
+
+#cims-filterered bair data
+#python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 1  --batch_size 400 --name bairfilter1 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --filterdata data/filterered15.txt --model_dir pretrain_models
+
+
+#dcgan, epic with n_past 2
+#python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001  --n_past 2 --n_future 10 --channels 3 --dataset epic --mse 1  --batch_size 100 --name newepic5 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/  
+
+
+
+
+
+
+
+
+
+
 
 
 ## test cmd

@@ -32,7 +32,8 @@ parser.add_argument('--dataset', default='moving_dot', help='dataset to train wi
 parser.add_argument('--last_frame_skip', action='store_true', help='if true, skip connections go between frame t and frame t+t rather than last ground truth frame')
 #parser.add_argument('--num_digits', type=int, default=2, help='number of digits for moving mnist')
 parser.add_argument('--noskip', type=int, default=0, help='Dont use skip connections (possible cause of blurring)')
-
+parser.add_argument('--mode', type=str, default='test', help='')
+parser.add_argument('--filterdata', type=str, default='', help='')
 
 opt = parser.parse_args()
 os.makedirs('%s' % opt.log_dir, exist_ok=True)
@@ -123,6 +124,11 @@ def make_gifs(x, idx):
     posterior_gen = []
     posterior_gen.append(x[0])
     x_in = x[0]
+
+    ssim = np.zeros((opt.batch_size, opt.n_future))
+    psnr = np.zeros((opt.batch_size, opt.n_future))
+    gen_seq = []
+    gt_seq = []
     for i in range(1, opt.n_eval):
         h = encoder(x_in)
         h_target = encoder(x[i])[0].detach()
@@ -141,7 +147,10 @@ def make_gifs(x, idx):
             h_pred = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0)).squeeze(0).detach()
             x_in = decoder([h_pred, skip]).detach()
             posterior_gen.append(x_in)
+            gen_seq.append(x_in.data.cpu().numpy())
+            gt_seq.append(x[i].data.cpu().numpy())
   
+    _, ssim[:, :], psnr[:,  :] = utils.eval_seq(gt_seq, gen_seq)
 
     nsample = opt.nsample
     ssim = np.zeros((opt.batch_size, nsample, opt.n_future))
@@ -224,6 +233,7 @@ def make_gifs(x, idx):
 
         fname = '%s/%d.gif' % (opt.log_dir, idx+i) 
         utils.save_gif_with_text(fname, gifs, text)
+    return (ssim, psnr)
 
 def add_border(x, color, pad=1):
     w = x.size()[1]
@@ -241,7 +251,20 @@ def add_border(x, color, pad=1):
     return px
 
 for i in range(0, opt.N, opt.batch_size):
-    x = next(testing_batch_generator)
-    make_gifs(x, i)
+    if opt.mode == 'test':
+        x = next(testing_batch_generator)
+    else:
+        x = next(training_batch_generator)
+    ssim, psnr = make_gifs(x, i)
+
+    #make_gifs(x, i)
     print(i)
 
+
+import pickle
+f = open("%s/stats.pkl"%(opt.log_dir), "wb")
+pickle.dump({
+    'ssim': ssim,
+    'psnr': psnr}, f)
+
+f.close()

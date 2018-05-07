@@ -47,7 +47,8 @@ def load_dataset(opt):
                 data_root=opt.data_root,
                 train=True,
                 seq_len=opt.max_step,
-                image_size=opt.image_width)
+                image_size=opt.image_width,
+                filterdata=opt.filterdata)
         test_data = RobotPush(
                 data_root=opt.data_root,
                 train=False,
