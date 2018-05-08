@@ -44,7 +44,7 @@ parser.add_argument('--mse', default=0, type=int, help='use mse else use masked 
 
 parser.add_argument('--skip_frames', default=0, type=int, help='# of frames to skip in between when using epic dataset')
 
-parser.add_argument('--gpuid', default=0, type=int, help='set_device')
+parser.add_argument('--gpuid', default=-1, type=int, help='set_device')
 parser.add_argument('--gpu_range', default='', type=str, help='eg. 1_5')
 parser.add_argument('--filterdata', default='', type=str, help='file to load list of dirs from (for bair)')
 
@@ -75,9 +75,10 @@ print("Random Seed: ", opt.seed)
 random.seed(opt.seed)
 torch.manual_seed(opt.seed)
 torch.cuda.manual_seed_all(opt.seed)
-torch.cuda.set_device(opt.gpuid)
 dtype = torch.cuda.FloatTensor
 writer = SummaryWriter(log_dir=os.path.join('plots', opt.name))
+if opt.gpuid > -1:
+    torch.cuda.set_device(opt.gpuid)
 
 
 # ---------------- load the models  ----------------
@@ -101,19 +102,23 @@ import models.lstm_parallel as lstm_models
 
 frame_predictor = lstm_models.lstm(opt.g_dim+opt.z_dim, opt.g_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
 posterior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
+prior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
 if opt.model_dir != '':
-    try:
-        frame_predictor.load_state_dict(saved_model['frame_predictor'].state_dict())
-        posterior.load_state_dict(saved_model['posterior'].state_dict())
+    #try:
+    frame_predictor.load_state_dict(saved_model['frame_predictor'].state_dict())
+    posterior.load_state_dict(saved_model['posterior'].state_dict())
+    prior.load_state_dict(saved_model['prior'].state_dict())
+    '''
     except:
         frame_predictor.load_state_dict(saved_model['frame_predictor'].module.state_dict())
         posterior.load_state_dict(saved_model['posterior'].module.state_dict())
-    #prior = saved_model['prior']
+        prior.load_state_dict(saved_model['prior'].module.state_dict())
+    '''
 else:
-    #prior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
+    prior = lstm_models.gaussian_lstm(opt.g_dim, opt.z_dim, opt.rnn_size, opt.rnn_layers, opt.batch_size)
     frame_predictor.apply(utils.init_weights)
     posterior.apply(utils.init_weights)
-    #prior.apply(utils.init_weights)
+    prior.apply(utils.init_weights)
 
 if opt.model == 'dcgan':
     if opt.image_width == 64:
@@ -143,7 +148,7 @@ else:
 
 frame_predictor_optimizer = opt.optimizer(frame_predictor.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 posterior_optimizer = opt.optimizer(posterior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-#prior_optimizer = opt.optimizer(prior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+prior_optimizer = opt.optimizer(prior.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 encoder_optimizer = opt.optimizer(encoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 decoder_optimizer = opt.optimizer(decoder.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
 
@@ -162,7 +167,7 @@ def kl_criterionL2(mu, logvar):
 # --------- transfer to gpu ------------------------------------
 frame_predictor.cuda()
 posterior.cuda()
-#prior.cuda()
+prior.cuda()
 encoder.cuda()
 decoder.cuda()
 mse_criterion.cuda()
@@ -173,15 +178,16 @@ if opt.gpu_range == '':
     frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(torch.cuda.device_count()))
     posterior = torch.nn.DataParallel(posterior, device_ids=range(torch.cuda.device_count()))
 else:
-    _g = opt.gpu_range.split('_')
-    g_st, g_end = int(_g[0]), int(_g[1])
-    encoder = torch.nn.DataParallel(encoder, device_ids=range(g_st, g_end))
-    decoder = torch.nn.DataParallel(decoder, device_ids=range(g_st, g_end))
-    frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=range(g_st, g_end))
-    posterior = torch.nn.DataParallel(posterior, device_ids=range(g_st, g_end))
+    #_g = opt.gpu_range.split('_')
+    #g_st, g_end = int(_g[0]), int(_g[1])
+    g_ids = [int(_) for _ in opt.gpu_range.split('_')]
+    encoder = torch.nn.DataParallel(encoder, device_ids=g_ids)
+    decoder = torch.nn.DataParallel(decoder, device_ids=g_ids)
+    frame_predictor = torch.nn.DataParallel(frame_predictor, device_ids=g_ids)
+    posterior = torch.nn.DataParallel(posterior, device_ids=g_ids)
 
 
-#prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
+prior = torch.nn.DataParallel(prior, device_ids=range(torch.cuda.device_count()))
 # --------- load a dataset ------------------------------------
 train_data, test_data = utils.load_dataset(opt)
 
@@ -216,7 +222,7 @@ testing_batch_generator = get_testing_batch()
 
 def init_hidden():
     all_hidden = []
-    for j in range(2): 
+    for j in range(3): 
         hidden = []
         for i in range(2):
             hidden.append((Variable(torch.zeros(opt.batch_size, opt.rnn_size).cuda()),
@@ -225,7 +231,7 @@ def init_hidden():
     return all_hidden
 
 def plot_rec(x, epoch, _type):
-    all_hidden0, all_hidden1 = init_hidden()
+    all_hidden0, all_hidden1, all_hidden2 = init_hidden()
 
     gen_seq, gt_seq, pred_seq = [], [], []
     gen_seq.append(x[0])
@@ -268,12 +274,12 @@ def plot_rec(x, epoch, _type):
 def train(x):
     frame_predictor.zero_grad()
     posterior.zero_grad()
-    #prior.zero_grad()
+    prior.zero_grad()
     encoder.zero_grad()
     decoder.zero_grad()
 
     # initialize the hidden state.
-    all_hidden0, all_hidden1 = init_hidden()
+    all_hidden0, all_hidden1, all_hidden2 = init_hidden()
 
     mse = 0
     kld = 0
@@ -286,7 +292,7 @@ def train(x):
         else:
             h = h[0]
         z_t, mu, logvar, all_hidden0 = posterior(h_target, all_hidden0)
-        #_, mu_p, logvar_p = prior(h)
+        _, mu_p, logvar_p, all_hidden2 = prior(h, all_hidden2)
         h_pred, all_hidden1 = frame_predictor(torch.cat([h, z_t], 1), all_hidden1)
         x_pred = decoder([h_pred, skip])
 
@@ -309,7 +315,7 @@ def train(x):
 
     frame_predictor_optimizer.step()
     posterior_optimizer.step()
-    #prior_optimizer.step()
+    prior_optimizer.step()
     encoder_optimizer.step()
     decoder_optimizer.step()
 
@@ -318,7 +324,7 @@ def train(x):
 for epoch in range(opt.niter):
     frame_predictor.train()
     posterior.train()
-    #prior.train()
+    prior.train()
     encoder.train()
     decoder.train()
     epoch_mse = 0
@@ -343,15 +349,16 @@ for epoch in range(opt.niter):
     print('[%02d] mse loss: %.5f | kld loss: %.5f | true_mse loss: %.5f (%d)' % (epoch, epoch_mse/opt.epoch_size, epoch_kld/opt.epoch_size, epoch__mse/opt.epoch_size, epoch*opt.epoch_size*opt.batch_size))
     writer.add_scalar('mse', epoch_mse/opt.epoch_size, epoch)
     writer.add_scalar('kld', epoch_kld/opt.epoch_size, epoch)
-    writer.add_scalar('true_mse', epoch__mse/opt.epoch_size, epoch)
+    #writer.add_scalar('true_mse', epoch__mse/opt.epoch_size, epoch)
 
     # plot some stuff
     frame_predictor.eval()
     encoder.eval()
     decoder.eval()
     posterior.eval()
-    #prior.eval()
-    
+    prior.eval()
+   
+    ''' 
     #### NOTE uncomment this line while only eval
     #x = next(training_batch_generator)
     ssim, psnr = plot_rec(x, epoch, 'train')
@@ -363,6 +370,7 @@ for epoch in range(opt.niter):
     print("recon Test ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
     #ssim, psnr = plot(x, epoch)
     #print("gen Test ssim: %.4f, psnr: %.4f"%(ssim, psnr))
+    ''' 
 
     # save the model
     torch.save({
@@ -370,6 +378,7 @@ for epoch in range(opt.niter):
         'decoder': decoder.module,
         'frame_predictor': frame_predictor.module,
         'posterior': posterior.module,
+        'prior': prior.module,
         'opt': opt},
         '%s/model.pth' % opt.log_dir)
     if epoch % 10 == 0:

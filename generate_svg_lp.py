@@ -11,6 +11,7 @@ import itertools
 import progressbar
 import numpy as np
 from scipy.ndimage.filters import gaussian_filter
+import scipy.misc
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batch_size', default=100, type=int, help='batch size')
@@ -149,8 +150,15 @@ def make_gifs(x, idx):
             posterior_gen.append(x_in)
             gen_seq.append(x_in.data.cpu().numpy())
             gt_seq.append(x[i].data.cpu().numpy())
-  
+ 
+    for b in range(x_in.size()[0]):
+        scipy.misc.imsave('logs/lapsample/%d_true.png'%b, np.transpose(gt_seq[-1][b,:,:,:], (1,2,0)))
+        scipy.misc.imsave('logs/lapsample/%d_fake.png'%b, np.transpose(gen_seq[-1][b,:,:,:], (1,2,0)))
+        #torchvision.utils.save_image(gt_seq[-1][b,:,:,:], 'plots/lapsample/%d_true.png'%b)
+        #torchvision.utils.save_image(gen_seq[-1][b,:,:,:], 'plots/lapsample/%d_fake.png'%b)
+    exit()
     _, ssim[:, :], psnr[:,  :] = utils.eval_seq(gt_seq, gen_seq)
+
 
     nsample = opt.nsample
     ssim = np.zeros((opt.batch_size, nsample, opt.n_future))
@@ -197,6 +205,7 @@ def make_gifs(x, idx):
                 all_gen[s].append(x_in)
         _, ssim[:, s, :], psnr[:, s, :] = utils.eval_seq(gt_seq, gen_seq)
 
+    
     progress.finish()
     utils.clear_progressbar()
 
@@ -250,6 +259,7 @@ def add_border(x, color, pad=1):
         px[:, pad:w+pad, pad:w+pad] = x
     return px
 
+'''
 for i in range(0, opt.N, opt.batch_size):
     if opt.mode == 'test':
         x = next(testing_batch_generator)
@@ -259,12 +269,29 @@ for i in range(0, opt.N, opt.batch_size):
 
     #make_gifs(x, i)
     print(i)
+'''
 
+allssim, allpsnr = [],[]
+for i in range(0, opt.N, opt.batch_size):
+    if opt.mode == 'test':
+        x = next(testing_batch_generator)
+    else:
+        x = next(training_batch_generator)
+    ssim, psnr = make_gifs(x, i)
+    print(i)
+    allssim.append(ssim)
+    allpsnr.append(psnr)
+
+#import pickle
+#f = open("%s/stats.pkl"%(opt.log_dir), "wb")
+#pickle.dump({
+#    'ssim': ssim,
+#    'psnr': psnr}, f)
 
 import pickle
 f = open("%s/stats.pkl"%(opt.log_dir), "wb")
 pickle.dump({
-    'ssim': ssim,
-    'psnr': psnr}, f)
+    'psnr': np.concatenate(allpsnr),
+    'ssim': np.concatenate(allssim)}, f)
 
 f.close()

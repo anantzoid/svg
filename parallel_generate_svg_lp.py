@@ -151,6 +151,7 @@ def make_gifs(x, idx):
     ssim = np.zeros((opt.batch_size, opt.n_future))
     psnr = np.zeros((opt.batch_size, opt.n_future))
 
+    '''
     gen_seq = []
     gt_seq = []
     for i in range(1, opt.n_eval):
@@ -176,7 +177,8 @@ def make_gifs(x, idx):
             gt_seq.append(x[i].data.cpu().numpy())
         
     _, ssim[:, :], psnr[:,  :] = utils.eval_seq(gt_seq, gen_seq)
-
+    '''
+    
     nsample = opt.nsample
     ssim = np.zeros((opt.batch_size, nsample, opt.n_future))
     psnr = np.zeros((opt.batch_size, nsample, opt.n_future))
@@ -225,6 +227,7 @@ def make_gifs(x, idx):
                 all_gen[s].append(x_in)
         _, ssim[:, s, :], psnr[:, s, :] = utils.eval_seq(gt_seq, gen_seq)
 
+    return (ssim, psnr)
     progress.finish()
     utils.clear_progressbar()
 
@@ -280,6 +283,7 @@ def add_border(x, color, pad=1):
         px[:, pad:w+pad, pad:w+pad] = x
     return px
 
+allssim, allpsnr = [],[]
 for i in range(0, opt.N, opt.batch_size):
     if opt.mode == 'test':
         x = next(testing_batch_generator)
@@ -287,12 +291,19 @@ for i in range(0, opt.N, opt.batch_size):
         x = next(training_batch_generator)
     ssim, psnr = make_gifs(x, i)
     print(i)
+    allssim.append(ssim)
+    allpsnr.append(psnr)
 
+#import pickle
+#f = open("%s/stats.pkl"%(opt.log_dir), "wb")
+#pickle.dump({
+#    'ssim': ssim,
+#    'psnr': psnr}, f)
 
 import pickle
 f = open("%s/stats.pkl"%(opt.log_dir), "wb")
 pickle.dump({
-    'ssim': ssim,
-    'psnr': psnr}, f)
+    'psnr': np.concatenate(allpsnr),
+    'ssim': np.concatenate(allssim)}, f)
 
 f.close()

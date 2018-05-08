@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=bair2
+#SBATCH --job-name=epic6
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --gres=gpu:4 -c4
@@ -97,15 +97,19 @@ source activate pyt3
 #python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001  --n_past 2 --n_future 10 --channels 3 --dataset epic --mse 1  --batch_size 100 --name newepic5 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/  
 
 
+#bairfilter with learned prior coz fixed prior worsened all metric even though mse went down
+#python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 1  --batch_size 400 --name bairfilter2 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --filterdata data/filterered15.txt --model_dir pretrain_models
 
 
 
+#python generate_svg_lp.py --model_path pretrain_models/svglp_bair.pth --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/pretrainedfull  --dataset bair --mode test --batch_size 10
+
+#skipframe 10
+#python parallel_original_lp_mask_fpversion.py --g_dim 128 --z_dim 64  --beta 0.0001  --n_past 2 --n_future 10 --channels 3 --dataset epic --mse 1  --batch_size 400 --name newepic6 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 10 --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/ 
 
 
 
-
-
-
+python generate_svg_lp.py --model_path /misc/vlgscratch4/FergusGroup/anant/svg//bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairfilter2/model.pth --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/bairfilter2  --dataset bair --mode test --N 20 --nsample 20
 
 ## test cmd
 ####python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --channels 3 --dataset epic --mse 1  --batch_size 32 --name temp --data_threads 1 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/ --skip_frames 3 --epoch_size 10 --image_width 64 --model vgg --data_root /misc/vlgscratch4/FergusGroup/anant/EPIC_KITCHENS_2018/64/
