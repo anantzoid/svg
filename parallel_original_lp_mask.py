@@ -47,6 +47,9 @@ parser.add_argument('--skip_frames', default=0, type=int, help='# of frames to s
 parser.add_argument('--gpuid', default=-1, type=int, help='set_device')
 parser.add_argument('--gpu_range', default='', type=str, help='eg. 1_5')
 parser.add_argument('--filterdata', default='', type=str, help='file to load list of dirs from (for bair)')
+parser.add_argument('--laplacian', type=int, default=0, help='Use mulitple gpus')
+parser.add_argument('--lap_factor', type=int, default=1, help='Use mulitple gpus')
+
 
 opt = parser.parse_args()
 if opt.model_dir != '':
@@ -157,6 +160,12 @@ mse_criterion = nn.MSELoss()
 if opt.mse == 0:
     pixel_mse_criterion = nn.MSELoss(reduce=False)
     pixel_mse_criterion.cuda()
+
+
+if opt.laplacian == 1:
+    lap = utils.Laplacian(opt.lap_factor)
+    lap.cuda()
+
 
 def kl_criterionL2(mu, logvar):
   # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
@@ -296,17 +305,21 @@ def train(x):
         h_pred, all_hidden1 = frame_predictor(torch.cat([h, z_t], 1), all_hidden1)
         x_pred = decoder([h_pred, skip])
 
-        if opt.mse == 1:
-            mse += mse_criterion(x_pred, x[i])
+        if opt.laplacian == 1:
+            mse += lap(x_pred, x[i])
             _m = mse
         else:
-            pmse = pixel_mse_criterion(x_pred, x[i])
-            _m = mse_criterion(x_pred, x[i])
-            #note: temp. refactor later
-            pixel_weights = Variable(torch.zeros(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
-            pixel_weights = pixel_weights.cuda()
-            pixel_weights[pmse.data > _m.data] = 1.0
-            mse += torch.mean(pmse.mul(pixel_weights.detach()))
+            if opt.mse == 1:
+                mse += mse_criterion(x_pred, x[i])
+                _m = mse
+            else:
+                pmse = pixel_mse_criterion(x_pred, x[i])
+                _m = mse_criterion(x_pred, x[i])
+                #note: temp. refactor later
+                pixel_weights = Variable(torch.zeros(opt.batch_size, opt.channels, opt.image_width, opt.image_width))
+                pixel_weights = pixel_weights.cuda()
+                pixel_weights[pmse.data > _m.data] = 1.0
+                mse += torch.mean(pmse.mul(pixel_weights.detach()))
 
         kld += kl_criterionL2(mu, logvar)
 
@@ -358,7 +371,6 @@ for epoch in range(opt.niter):
     posterior.eval()
     prior.eval()
    
-    ''' 
     #### NOTE uncomment this line while only eval
     #x = next(training_batch_generator)
     ssim, psnr = plot_rec(x, epoch, 'train')
@@ -370,7 +382,6 @@ for epoch in range(opt.niter):
     print("recon Test ssim: %.4f, psnr: %.4f"%(ssim[-1], psnr[-1]))
     #ssim, psnr = plot(x, epoch)
     #print("gen Test ssim: %.4f, psnr: %.4f"%(ssim, psnr))
-    ''' 
 
     # save the model
     torch.save({

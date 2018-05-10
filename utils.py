@@ -295,8 +295,81 @@ def init_weights(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1 or classname.find('Linear') != -1:
         m.weight.data.normal_(0.0, 0.02)
-        m.bias.data.fill_(0)
+        try:
+            m.bias.data.fill_(0)
+        except:
+            pass
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
+        try:
+            m.bias.data.fill_(0)
+        except:
+            pass
 
+
+
+import torch.nn.functional as F
+import operator
+import functools
+import torch.nn as nn
+class Laplacian(nn.Module):
+    def __init__(self, use_factor, max_levels=3):
+        super(Laplacian, self).__init__()
+        if use_factor == 1:
+            self._factor = [100, 1, 0.1, 0.01, 0.001, 0.0001]#(2**(-2*(en+1)))
+        else:
+            self._factor = [1]*(max_levels+1)
+        self.max_levels = max_levels
+
+    def gauss_kernel(self, size=5, sigma=1.0):
+        grid = np.float32(np.mgrid[0:size,0:size].T)
+        gaussian = lambda x: np.exp((x - size//2)**2/(-2*sigma**2))**2
+        kernel = np.sum(gaussian(grid), axis=2)
+        kernel /= np.sum(kernel)
+        return kernel
+
+    def conv_gauss(self, t_input, stride=1, k_size=5, sigma=1.6, repeats=1):
+        #kernel = np.array(([self.gauss_kernel(k_size, sigma)]*9)).reshape(3,3,k_size,k_size)
+        #kernel = Variable(torch.from_numpy(kernel).cuda()).float()       
+        kernel = Variable(torch.from_numpy(self.gauss_kernel(k_size, sigma)).unsqueeze(0).unsqueeze(0)).cuda().float()
+        pyr = Variable(torch.FloatTensor(t_input.size())).cuda()
+        for i in range(t_input.size()[1]):
+             pyr[:, i,:,:] = F.conv2d(t_input[:, i,:,:].unsqueeze(1), kernel, padding=2).squeeze(1)
+        return pyr
+
+    def make_laplacian_pyramid(self, x, max_levels):
+        t_pyr = []
+        current = x
+        for level in range(max_levels):
+            t_gauss = self.conv_gauss(current, stride=1, k_size=5, sigma=2.0)
+            #save_tensors_image('diff.png', [current, t_gauss])
+            #save_tensors_image('current.png', current)
+            #save_tensors_image('gauss.png', t_gauss)
+            #exit()
+            t_diff = current - t_gauss
+            t_pyr.append(t_diff)
+            current = F.avg_pool2d(t_gauss, 2, 2)
+        t_pyr.append(current)
+        return t_pyr
+
+    def tograyscale(self, x):
+        x = torch.cat([(0.299*x[:,:1,:,:]), (0.587*x[:,1:2,:,:]), (0.114*x[:,2:,:,:])], dim=1)
+        return torch.sum(x, dim=1).unsqueeze(1)
+
+
+    def laploss(self, x_pred, x):
+        #x_pred = self.tograyscale(x_pred)
+        #x = self.tograyscale(x)
+
+        t_pyr1 = self.make_laplacian_pyramid(x_pred, self.max_levels) 
+        t_pyr2 = self.make_laplacian_pyramid(x, self.max_levels)
+        #t_losses = [(a-b).norm(1)/float(functools.reduce(operator.mul, a.size())) for a,b in zip(t_pyr1, t_pyr2)]
+
+        #t_losses = [(a-b).norm(1)*self._factor[en]/float(functools.reduce(operator.mul, a.size())) for en,(a,b) in enumerate(zip(t_pyr1, t_pyr2))]
+        t_losses = [(a-b).norm(1)**(2**(-2*(en+1)))/float(functools.reduce(operator.mul, a.size())) for en,(a,b) in enumerate(zip(t_pyr1, t_pyr2))]
+        #print(t_losses)
+        #exit()
+        return torch.sum(torch.cat(t_losses))#*x_pred.size()[0])
+    
+    def forward(self, x_pred, x):
+        return self.laploss(x_pred, x)
