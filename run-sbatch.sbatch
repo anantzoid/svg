@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --verbose
-#SBATCH --job-name=lap
+#SBATCH --job-name=lap2
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --gres=gpu:4 -c4
@@ -109,7 +109,7 @@ source activate pyt3
 
 
 
-
+### M====> Mind the prior
 #python generate_svg_lp.py --model_path /misc/vlgscratch4/FergusGroup/anant/svg//bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000bairfilter2/model.pth --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/bairfilter2  --dataset bair --mode test --N 20 --nsample 20
 
 #python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 1  --batch_size 200 --name lap1 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 1 --model_dir pretrain_models/
@@ -132,4 +132,16 @@ source activate pyt3
 #python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 1  --batch_size 200 --name lap3 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 1  --lap_factor 0
 
 
-python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 1  --batch_size 400 --name temp --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 0  --lap_factor 0 --model_dir pretrain_models/
+#python parallel_original_lp_mask.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 1  --batch_size 400 --name temp --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 600 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 0  --lap_factor 0 --model_dir pretrain_models/
+
+#python parallel_lp.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 0  --batch_size 300 --name lapfix0 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 300 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 1
+
+#python parallel_lp.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 0  --batch_size 600 --name lapfix1 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 300 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 1 --model_dir /misc/vlgscratch4/FergusGroup/anant/svg//bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000lapfix0
+
+
+#python parallel_lp.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 0  --batch_size 600 --name lapfix2 --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 300 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 1 --lapweight 0.01
+
+
+#python parallel_lp.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 0  --batch_size 400 --name lapfix1cont --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 300 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 1 --model_dir /misc/vlgscratch4/FergusGroup/anant/svg//bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000lapfix1
+
+python parallel_lp.py --g_dim 128 --z_dim 64  --beta 0.0001 --n_past 2 --n_future 10 --channels 3 --dataset bair --mse 0  --batch_size 400 --name lapfix2cont --data_threads 10 --log_dir /misc/vlgscratch4/FergusGroup/anant/svg/  --epoch_size 300 --image_width 64 --model dcgan --data_root /misc/vlgscratch4/FergusGroup/denton/data/bair_robot_push/ --laplacian 1 --lapweight 0.01 --model_dir /misc/vlgscratch4/FergusGroup/anant/svg//bair/model=dcgan64x64-rnn_size=256-rnn_layers=2-n_past=2-n_future=10-lr=0.0020-g_dim=128-z_dim=64-last_frame_skip=False-beta=0.0001000lapfix2

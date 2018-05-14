@@ -313,7 +313,7 @@ import operator
 import functools
 import torch.nn as nn
 class Laplacian(nn.Module):
-    def __init__(self, use_factor, max_levels=3):
+    def __init__(self, use_factor=True, max_levels=3):
         super(Laplacian, self).__init__()
         if use_factor == 1:
             self._factor = [100, 1, 0.1, 0.01, 0.001, 0.0001]#(2**(-2*(en+1)))
@@ -371,5 +371,19 @@ class Laplacian(nn.Module):
         #exit()
         return torch.sum(torch.cat(t_losses))#*x_pred.size()[0])
     
-    def forward(self, x_pred, x):
-        return self.laploss(x_pred, x)
+    def laplossnew(self, scales, x):
+        t_pyr2 = []
+        for s in range(len(scales)):
+            t_gauss = self.conv_gauss(scales[s], stride=1, k_size=5, sigma=2.0)
+            #current = F.avg_pool2d(scales[s], 2, 2)
+            t_pyr2.append(scales[s] - t_gauss)
+
+        t_pyr2 = t_pyr2[::-1]
+        t_pyr1 = self.make_laplacian_pyramid(x, self.max_levels) 
+
+        t_losses = [(a-b).norm(1)**(2**(-2*(en+1)))/float(functools.reduce(operator.mul, a.size())) for en,(a,b) in enumerate(zip(t_pyr1, t_pyr2))]
+        return torch.sum(torch.cat(t_losses))#*x_pred.size()[0])
+
+    def forward(self, x_pred, scales, x):
+        return self.laplossnew(scales + [x_pred], x)
+        #return self.laploss(x_pred, x)

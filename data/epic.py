@@ -50,17 +50,17 @@ class EpicKitchen(object):
             self.d = np.random.randint(0, len(self.dirs))
             self.img_counter = np.random.randint(1, self.frame_limit - self.seq_len)
         image_seq = []
-        #try:
-        for i in range(self.seq_len):
-            i_str = str(self.img_counter + i)
-            fname = '%s/frame_%s%s.jpg' % (self.dirs[self.d], '0'*(10-len(i_str)) ,i_str)
-            im = imread(fname)
-            #print(fname)
-            im = im.reshape(1, self.image_size, self.image_size, 3)
-            image_seq.append(im/255.)
-        #except:
-        #    # to account for any missing indices while retreiveing data
-        #    return self.get_seq()
+        try:
+            for i in range(self.seq_len):
+                i_str = str(self.img_counter + i)
+                fname = '%s/frame_%s%s.jpg' % (self.dirs[self.d], '0'*(10-len(i_str)) ,i_str)
+                im = imread(fname)
+                #print(fname)
+                im = im.reshape(1, self.image_size, self.image_size, 3)
+                image_seq.append(im/255.)
+        except:
+            # to account for any missing indices while retreiveing data
+            return self.get_seq()
 
         image_seq = image_seq[::self.skip]
         image_seq = np.concatenate(image_seq, axis=0)

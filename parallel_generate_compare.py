@@ -1,3 +1,7 @@
+
+####
+# This script compares generations with baseline
+#
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -50,21 +54,15 @@ torch.cuda.manual_seed_all(opt.seed)
 dtype = torch.cuda.FloatTensor
 
 
-
+################### Target Model ##############################
 # ---------------- load the models  ----------------
 tmp = torch.load(opt.model_path)
-try:
-    frame_predictor = tmp['frame_predictor'].module
-    posterior = tmp['posterior'].module
-    encoder = tmp['encoder'].module
-    decoder = tmp['decoder'].module
-except:
-    frame_predictor = tmp['frame_predictor']
-    posterior = tmp['posterior']
-    encoder = tmp['encoder']
-    decoder = tmp['decoder']
-
+frame_predictor = tmp['frame_predictor']
+posterior = tmp['posterior']
+encoder = tmp['encoder']
+decoder = tmp['decoder']
 prior = tmp['prior']
+
 frame_predictor.eval()
 prior.eval()
 encoder.eval()
@@ -72,6 +70,7 @@ decoder.eval()
 frame_predictor.batch_size = opt.batch_size
 posterior.batch_size = opt.batch_size
 prior.batch_size = opt.batch_size
+
 opt.g_dim = tmp['opt'].g_dim
 opt.z_dim = tmp['opt'].z_dim
 opt.num_digits = tmp['opt'].num_digits
@@ -84,6 +83,31 @@ posterior.cuda()
 prior.cuda()
 encoder.cuda()
 decoder.cuda()
+
+################## Baseline Model ###########################
+# ---------------- load the models  ----------------
+tmp = torch.load('pretrain_models/model.pth')
+blframe_predictor = tmp['frame_predictor']
+blposterior = tmp['posterior']
+blencoder = tmp['encoder']
+bldecoder = tmp['decoder']
+blprior = tmp['prior']
+
+blframe_predictor.eval()
+blprior.eval()
+blencoder.eval()
+bldecoder.eval()
+blframe_predictor.batch_size = opt.batch_size
+blposterior.batch_size = opt.batch_size
+blprior.batch_size = opt.batch_size
+
+# --------- transfer to gpu ------------------------------------
+blframe_predictor.cuda()
+blposterior.cuda()
+blprior.cuda()
+blencoder.cuda()
+bldecoder.cuda()
+
 
 # ---------------- set the options ----------------
 opt.dataset = tmp['opt'].dataset
@@ -140,10 +164,10 @@ def init_hidden():
 
 # --------- eval funtions ------------------------------------
 
-def make_gifs(x, idx):
+def make_gifs(x, idx, models):
+    _type, frame_predictor, prior, encoder, decoder, posterior = models
+
     # get approx posterior sample
-    #frame_predictor.hidden = frame_predictor.init_hidden()
-    #posterior.hidden = posterior.init_hidden()
     all_hidden0, all_hidden1, all_hidden2 = init_hidden()
     posterior_gen = []
     posterior_gen.append(x[0])
@@ -154,6 +178,7 @@ def make_gifs(x, idx):
     gen_seq = []
     gt_seq = []
     for i in range(1, opt.n_eval):
+        
         h = encoder(x_in)
         h_target = encoder(x[i])[0].detach()
         if opt.last_frame_skip or i < opt.n_past:	
@@ -161,16 +186,22 @@ def make_gifs(x, idx):
         else:
             h, _ = h
         h = h.detach()
-        z_t, _, _, all_hidden0 = posterior(h_target.unsqueeze(0), all_hidden0)
+        if _type == 'bl':
+            z_t, _, _ = posterior(h_target.unsqueeze(0))
+        else:
+            z_t, _, _, all_hidden0 = posterior(h_target.unsqueeze(0), all_hidden0)
         z_t = z_t.squeeze(0)
         if i < opt.n_past:
             #frame_predictor(torch.cat([h, z_t], 1)) 
             posterior_gen.append(x[i])
             x_in = x[i]
         else:
-            h_pred, all_hidden1 = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0), all_hidden1)
+            if _type == 'bl':
+                h_pred = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0))
+            else:
+                h_pred, all_hidden1 = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0), all_hidden1) 
             h_pred = h_pred.squeeze(0).detach()
-            x_in = decoder([h_pred, skip])[0].detach()
+            x_in = decoder([h_pred, skip], _type)[0].detach()
             posterior_gen.append(x_in)
             gen_seq.append(x_in.data.cpu().numpy())
             gt_seq.append(x[i].data.cpu().numpy())
@@ -202,10 +233,16 @@ def make_gifs(x, idx):
             h = h.detach()
             if i + 1 < opt.n_past:
                 h_target = encoder(x[i])[0].detach()
-                z_t, _, _, all_hidden0 = posterior(h_target.unsqueeze(0), all_hidden0)
+                if _type == 'bl':
+                    z_t, _, _ = prior(h.unsqueeze(0))
+                else:
+                    z_t, _, _, all_hidden2 = prior(h.unsqueeze(0), all_hidden2)
                 z_t = z_t.squeeze(0)
             else:
-                z_t, _, _, all_hidden2 = prior(h.unsqueeze(0), all_hidden2)
+                if _type == 'bl':
+                    z_t, _, _ = prior(h.unsqueeze(0))
+                else:
+                    z_t, _, _, all_hidden2 = prior(h.unsqueeze(0), all_hidden2)
                 z_t = z_t.squeeze(0)
                 z_t = Variable(torch.cuda.FloatTensor(opt.batch_size, opt.z_dim).normal_()).cuda()
             if i < opt.n_past:
@@ -213,12 +250,15 @@ def make_gifs(x, idx):
                 x_in = x[i]
                 all_gen[s].append(x_in)
             else:
-                h, all_hidden1 = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0), all_hidden1)
+                if _type == 'bl':
+                    h = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0))
+                else:
+                    h, all_hidden1 = frame_predictor(torch.cat([h, z_t], 1).unsqueeze(0), all_hidden1)
                 h = h.squeeze(0).detach()
                 if opt.noskip:
-                    x_in = decoder(h)[0].detach()
+                    x_in = decoder(h, _type)[0].detach()
                 else:
-                    x_in = decoder([h, skip])[0].detach()
+                    x_in = decoder([h, skip], _type)[0].detach()
 
                 gen_seq.append(x_in.data.cpu().numpy())
                 gt_seq.append(x[i].data.cpu().numpy())
@@ -228,15 +268,18 @@ def make_gifs(x, idx):
     #return (ssim, psnr)
     progress.finish()
     utils.clear_progressbar()
+    return (ssim, psnr, all_gen, posterior_gen)
 
+def print_gifs(idx, x, all_gen, posterior_gen, blallgen, blposterior_gen, ssim, blssim):
     ###### ssim ######
     for i in range(opt.batch_size):
         gifs = [ [] for t in range(opt.n_eval) ]
         text = [ [] for t in range(opt.n_eval) ]
         mean_ssim = np.mean(ssim[i], 1)
-        print(np.max(mean_ssim), np.max(np.mean(psnr[i], 1)))
+        blmean_ssim = np.mean(blssim[i], 1)
 
         ordered = np.argsort(mean_ssim)
+        blordered = np.argsort(blmean_ssim)
         for t in range(opt.n_eval):
             # gt 
             gifs[t].append(add_border(x[t][i], 'green'))
@@ -246,25 +289,30 @@ def make_gifs(x, idx):
                 color = 'green'
             else:
                 color = 'red'
+            gifs[t].append(add_border(blposterior_gen[t][i], color))
+            text[t].append('BL \nposterior')
             gifs[t].append(add_border(posterior_gen[t][i], color))
             text[t].append('Approx.\nposterior')
-            # best 
-            if t < opt.n_past:
-                color = 'green'
-            else:
-                color = 'red'
+
+            sidx = ordered[-1]
+            blsidx = blordered[-1]
+            gifs[t].append(add_border(blall_gen[blsidx][t][i], color))
+            text[t].append('Best BL \n SSIM')
+
+
             sidx = ordered[-1]
             gifs[t].append(add_border(all_gen[sidx][t][i], color))
             text[t].append('Best SSIM')
+
+
             # random 3
-            for s in range(3):
-                sidx = np.random.randint(nsample)
+            for s in range(1):
+                sidx = np.random.randint(opt.nsample)
                 gifs[t].append(add_border(all_gen[sidx][t][i], color))
                 text[t].append('Random\nsample %d' % (s+1))
 
         fname = '%s/%d.gif' % (opt.log_dir, idx+i) 
         utils.save_gif_with_text(fname, gifs, text)
-    return (ssim, psnr)
 
 def add_border(x, color, pad=1):
     w = x.size()[1]
@@ -284,19 +332,16 @@ def add_border(x, color, pad=1):
 allssim, allpsnr = [],[]
 for i in range(0, opt.N, opt.batch_size):
     if opt.mode == 'test':
-        x = next(testing_batch_generator)
+        databatch = next(testing_batch_generator)
     else:
-        x = next(training_batch_generator)
-    ssim, psnr = make_gifs(x, i)
+        databatch = next(training_batch_generator)
+    #blssim, blpsnr, blall_gen, blposterior_gen = make_gifs(databatch, i, ('bl', blframe_predictor, blprior, blencoder, bldecoder, blposterior))
+    ssim, psnr, all_gen, posterior_gen = make_gifs(databatch, i, ('', frame_predictor, prior, encoder, decoder, posterior))
+    #print_gifs(i, databatch, all_gen, posterior_gen, blall_gen, blposterior_gen, ssim, blssim)
     print(i)
     allssim.append(ssim)
     allpsnr.append(psnr)
 
-#import pickle
-#f = open("%s/stats.pkl"%(opt.log_dir), "wb")
-#pickle.dump({
-#    'ssim': ssim,
-#    'psnr': psnr}, f)
 
 import pickle
 f = open("%s/stats.pkl"%(opt.log_dir), "wb")
